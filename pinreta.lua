@@ -5525,7 +5525,6 @@ end
         -- Nothing is charged any more. The create-bullet hook below fires a fixed
         -- burst in a single shot, so the hold-to-charge ramp, its progress bar and
         -- every slider that configured them are gone.
-        local charge_shot_key = nil
         local charge_shot_bullets = 10
 
         -- ─── AUTO REFILL MAG (ported verbatim from pin.reta V2) ───────────────
@@ -5951,9 +5950,9 @@ end
                             -- Auto Reload: a shot is a useful clock for an ammo check.
                             if cheat._auto_reload_tick then pcall(cheat._auto_reload_tick) end
                             local charged_shots = 1
-                            -- ONE TAP: there is no charge ramp to read any more, so the
-                            -- full burst goes out with a single shot.
-                            if feature_active(charge_shot_enabled, 'gunmods_chargeshot_key') then
+                            -- ONE TAP: no charge ramp to read and no keybind -- the master
+                            -- toggle alone decides, so the full burst goes out with one shot.
+                            if charge_shot_enabled then
                                 charged_shots = math.clamp(math.floor(charge_shot_bullets), 1, 15)
                             end
                             if charged_shots > 1 then
@@ -6227,13 +6226,6 @@ end
             Callback = function(v)
                 charge_shot_enabled = v == true
             end
-        })
-        charge_shot_key = charge_shot_toggle:AddKeyPicker('gunmods_chargeshot_key', {
-            Default = 'None',
-            SyncToggleState = true,
-            Mode = 'Toggle',
-            Text = 'One Tap key',
-            NoUI = false
         })
         gunmodbox:AddToggle('gunmods_instantreload', {Text = 'Instant Reload', Default = false, Callback = function(v)
             cheat._instant_reload = v and true or false
