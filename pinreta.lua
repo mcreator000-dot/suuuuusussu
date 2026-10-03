@@ -7746,6 +7746,7 @@ end
                 silent_aim.target_part = nil
                 silent_aim.is_npc = false
                 silent_aim.isvisible = false
+                silent_aim.hitscanning = false
                 silent_aim.manipulated = false
                 silent_aim.manipulated_origin = nil
                 silent_aim.indicator_text = ""
@@ -7786,6 +7787,12 @@ end
             end
             
             silent_aim.manipulated = false
+            -- V2 clears this on every scan cycle (and on the no-target path); ours
+            -- never cleared it at all, so ONE successful hitscan solve left it true for
+            -- the rest of the session. triggerable = isvisible or hitscanning then
+            -- stayed true forever and the triggerbot fired at targets it could not
+            -- possibly hit. Ours re-solves every frame, so clear it per frame.
+            silent_aim.hitscanning = false
             local old_origin = silent_aim.manipulated_origin
     task.wait()
             silent_aim.manipulated_origin = nil
@@ -7917,6 +7924,7 @@ end
                 end
             else
                 silent_aim.isvisible = false
+                silent_aim.hitscanning = false
             end
 
             if silent_aim.target_part then
