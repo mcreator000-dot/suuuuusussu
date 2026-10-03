@@ -7339,6 +7339,51 @@ end
         root.CFrame = replicated_cframe
     end
 
+    -- --- TP KILL TELEPORT VERIFICATION ------------------------------------------
+    -- TP Kill drops you ~200 studs above the target, but the hit is still credited from
+    -- whatever position the server believes you hold (UAC.LastVerifiedPos). Firing the
+    -- instant the teleport lands credits the shot from the ground, so the kill does not
+    -- register. Same idea as Wallbang TP: wait for the server to catch up before firing.
+    cheat.tpkill = {
+        tolerance = 4,
+        wait_max = 0.45,
+    }
+    cheat.tpkill.destination = nil
+    cheat.tpkill.arm_tick = nil
+    cheat.tpkill.verified = false
+
+    cheat.tpkill.arm = function(destination)
+        cheat.tpkill.destination = destination
+        cheat.tpkill.arm_tick = tick()
+        cheat.tpkill.verified = false
+    end
+
+    cheat.tpkill.clear = function()
+        cheat.tpkill.destination = nil
+        cheat.tpkill.arm_tick = nil
+        cheat.tpkill.verified = false
+    end
+
+    -- true while a teleport is still waiting for the server. Once verified (or once the
+    -- wait expires, so the player is never left unable to shoot) this returns false.
+    cheat.tpkill.awaiting_verification = function()
+        local self = cheat.tpkill
+        local dest = self.destination
+        local armed = self.arm_tick
+        if not (dest and armed) then return false end
+        if self.verified then return false end
+        local verified = cheat.wallbang_tp.last_verified_pos()
+        if verified and (verified - dest).Magnitude <= self.tolerance then
+            self.verified = true
+            return false
+        end
+        if tick() - armed > self.wait_max then
+            self.verified = true
+            return false
+        end
+        return true
+    end
+
     cheat.utility.track_connection(RunService.Heartbeat:Connect(function()
         apply_hitscan_player_spoof()
         cheat.wallbang_tp.apply()
@@ -8004,6 +8049,11 @@ end
             end
             if rage_active then
                 triggerable = true  -- rage bot fires on lock; Auto Wallbang still gates it below
+            end
+            -- TP Kill: nothing may fire until the server has verified the teleport,
+            -- otherwise the hit is credited from the ground and the kill never lands.
+            if cheat.tpkill and cheat.tpkill.awaiting_verification() then
+                triggerable = false
             end
             
             if trigger_active and not triggerable and now - last_triggerable_scan >= fast_target_scan_interval then
@@ -18344,6 +18394,10 @@ end})
 
                     local new_pos = current_tp_target.Position + Vector3.new(0, tpkill_height, 0)
                     hrp.CFrame = CFrame.new(new_pos) * hrp.CFrame.Rotation
+                    -- Hold fire until the server has verified this position.
+                    pcall(function()
+                        if cheat.tpkill then cheat.tpkill.arm(new_pos) end
+                    end)
                     cheat.Library:Notify("TP Kill", "Teleported above targeted enemy")
                 else
                     current_tp_target = nil
@@ -18359,6 +18413,9 @@ end})
                     hrp.CFrame = tpkill_original_cf + Vector3.new(0, 2, 0)
                     if cheat.real_CFrame then cheat.real_CFrame = hrp.CFrame end
                     tpkill_original_cf = nil
+                    pcall(function()
+                        if cheat.tpkill then cheat.tpkill.clear() end
+                    end)
                     current_tp_target = nil
                     cheat.Library:Notify("TP Kill", "Returned to original position")
 
