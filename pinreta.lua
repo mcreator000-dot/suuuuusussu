@@ -4858,22 +4858,42 @@
         return part.Position - (vel * rewind)
     end
 
+    -- Is the obstruction between us and the target actually thin enough to shoot
+    -- through? BOTH blocks along the line must be thin, so a thick wall behind a thin
+    -- first one still counts as blocked. Driven by the Wall Thickness slider: this is
+    -- what stops Auto Wallbang spending rounds into thick geometry near cover.
     local function ragebot_wallbangable(origin, target_pos)
         if not (origin and target_pos) then return false end
+        local dir = target_pos - origin
+        if dir.Magnitude < 0.05 then return false end
+
         local params = RaycastParams.new()
         params.FilterType = Enum.RaycastFilterType.Exclude
         params.FilterDescendantsInstances = { LocalPlayer.Character, workspace.CurrentCamera }
         local noc = workspace:FindFirstChild("NoCollision")
         if noc then params.FilterDescendantsInstances = { LocalPlayer.Character, workspace.CurrentCamera, noc } end
-        local res = workspace:Raycast(origin, target_pos - origin, params)
+
+        local thickness = tonumber(silent_aim.rage_bot_wallbang_thickness) or 2.0
+        local res = workspace:Raycast(origin, dir, params)
         if not res or not res.Instance then
-            return true -- nothing blocking
+            return true -- nothing blocking at all
         end
-        local part = res.Instance
-        local size = part.Size
-        local min_axis = math.min(size.X, size.Y, size.Z)
-        return minAxisLeq(min_axis, silent_aim.rage_bot_wallbang_thickness or 2.0)
+
+        local size = res.Instance.Size
+        if math.min(size.X, size.Y, size.Z) > thickness then
+            return false
+        end
+
+        -- step just past the first block: anything behind it must be thin as well
+        local past = res.Position + dir.Unit * 0.2
+        local res2 = workspace:Raycast(past, target_pos - past, params)
+        if res2 and res2.Instance then
+            local size2 = res2.Instance.Size
+            return math.min(size2.X, size2.Y, size2.Z) <= thickness
+        end
+        return true
     end
+    cheat.utility.ragebot_wallbangable = ragebot_wallbangable
 
     function minAxisLeq(a, b)
         return (tonumber(a) or 0) <= (tonumber(b) or 0)
@@ -6125,7 +6145,13 @@ end
                                     if silent_aim.rage_bot_prediction then
                                         Destination = ragebot_predict_position(Origin, Destination, DestinationVelocity, ProjectileSpeed, silent_aim.rage_bot_prediction_mult)
                                     end
-                                    if not silent_aim.rage_bot_wallbang and not silent_aim.isvisible then
+                                    -- Auto Wallbang alone used to be enough to redirect the
+                                    -- shot at an unseen target; now the obstruction has to be
+                                    -- thin enough first, otherwise the round is wasted.
+                                    if not silent_aim.isvisible
+                                        and not (silent_aim.rage_bot_wallbang and silent_aim.target_part
+                                            and cheat.utility.ragebot_wallbangable
+                                            and cheat.utility.ragebot_wallbangable(Origin, Destination)) then
                                         return old(self, unpack(args, 1, argCount))
                                     end
                                 end
@@ -8059,10 +8085,17 @@ end
                     end
                 end
 
-                -- Rage bot wallbang check
+                -- Rage bot wallbang check. Auto Wallbang used to fire at anything the
+                -- moment it was on, which is what burned ammo against thick geometry.
+                -- It now only spends the round when the obstruction is genuinely thin
+                -- enough (the Wall Thickness slider).
                 if should_trigger and rage_active and not silent_aim.isvisible
-                    and not silent_aim.hitscanning and not silent_aim.rage_bot_wallbang
-                    and not silent_aim._wallbang_ready then
+                    and not silent_aim.hitscanning and not silent_aim._wallbang_ready
+                    and not (silent_aim.rage_bot_wallbang and silent_aim.target_part
+                        and cheat.utility.ragebot_wallbangable
+                        and cheat.utility.ragebot_wallbangable(
+                            silent_aim.manipulated_origin or Camera.CFrame.p,
+                            silent_aim.target_part.Position)) then
                     should_trigger = false
                 end
             end
