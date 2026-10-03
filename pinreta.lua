@@ -5521,112 +5521,12 @@ end
         -- pin.reta compatibility stubs (GHOST_HOOK doesn't have these features)
         local charge_shot_enabled = false
 
-        -- ─── Charge Shot (ported from pin.reta V2) ────────────────────────────
-        -- Hold-to-charge: `charge_shot_alpha` ramps 0..1, and the create-bullet
-        -- hook below turns that into a bullet count. The bar widget shows the
-        -- eased progress plus the current/max bullet readout.
+        -- ─── One Tap (was Charge Shot) ────────────────────────────────
+        -- Nothing is charged any more. The create-bullet hook below fires a fixed
+        -- burst in a single shot, so the hold-to-charge ramp, its progress bar and
+        -- every slider that configured them are gone.
         local charge_shot_key = nil
         local charge_shot_bullets = 10
-        local charge_shot_alpha = 0
-        local charge_shot_display_alpha = 0
-        local charge_shot_reset_pending = false
-        local last_charge_shot_active = false
-        local charge_shot_bar_width = 100
-        local charge_shot_bar_height = 6
-        local charge_shot_bar_offset = 58
-        local charge_shot_bar_color = Color3.fromRGB(0, 255, 0)
-        local charge_shot_text_color = Color3.fromRGB(255, 255, 255)
-
-        local charge_widget = {
-            bg = cheat.utility.new_drawing("Square", {
-                Size = Vector2.new(102, 8),
-                Position = Vector2.new(0, 0),
-                Color = Color3.fromRGB(20, 20, 20),
-                Filled = true,
-                Transparency = 1,
-                Visible = false,
-                ZIndex = 105
-            }),
-            fill = cheat.utility.new_drawing("Square", {
-                Size = Vector2.new(0, 6),
-                Position = Vector2.new(0, 0),
-                Color = Color3.fromRGB(0, 255, 0),
-                Filled = true,
-                Transparency = 1,
-                Visible = false,
-                ZIndex = 106
-            }),
-            text = cheat.utility.new_drawing("Text", {
-                Text = "CHARGE SHOT [0 / 10]",
-                Size = 13,
-                Center = true,
-                Outline = true,
-                OutlineColor = Color3.fromRGB(0, 0, 0),
-                Color = Color3.fromRGB(255, 255, 255),
-                Position = Vector2.new(0, 0),
-                Visible = false,
-                ZIndex = 107
-            })
-        }
-
-        -- Charger: ramps alpha while armed, eases the displayed value, and draws
-        -- the bar. When disarmed it zeroes both so the next charge starts clean.
-        cheat.utility.new_renderstepped(function(delta)
-            local active = charge_shot_enabled == true
-
-            if charge_shot_reset_pending then
-                charge_shot_alpha = 0
-                charge_shot_display_alpha = 0
-                charge_shot_reset_pending = false
-            end
-
-            if active and not last_charge_shot_active then
-                charge_shot_alpha = 0
-                charge_shot_display_alpha = 0
-            end
-            last_charge_shot_active = active
-
-            if active then
-                charge_shot_alpha = math.clamp(charge_shot_alpha + ((delta or 0) * 0.45), 0, 1)
-                local frame_delta = math.clamp(tonumber(delta) or 0, 0, 0.1)
-                local smooth_alpha = 1 - math.exp(-14 * frame_delta)
-                charge_shot_display_alpha += (charge_shot_alpha - charge_shot_display_alpha) * smooth_alpha
-                if math.abs(charge_shot_alpha - charge_shot_display_alpha) < 0.0005 then
-                    charge_shot_display_alpha = charge_shot_alpha
-                end
-
-                local viewport = Camera.ViewportSize
-                local center = Vector2.new(viewport.X / 2, viewport.Y / 2)
-                local barWidth = charge_shot_bar_width
-                local barHeight = charge_shot_bar_height
-                local barPos = center + Vector2.new(-barWidth / 2, charge_shot_bar_offset)
-
-                charge_widget.bg.Position = barPos - Vector2.new(1, 1)
-                charge_widget.bg.Size = Vector2.new(barWidth + 2, barHeight + 2)
-                charge_widget.bg.Color = Color3.fromRGB(20, 20, 20)
-                charge_widget.bg.Visible = true
-
-                local max_b = math.clamp(math.floor(charge_shot_bullets), 1, 15)
-                local cur_b = math.clamp(math.floor((charge_shot_alpha * max_b) + 0.5), 1, max_b)
-
-                charge_widget.fill.Position = barPos
-                charge_widget.fill.Size = Vector2.new(barWidth * charge_shot_display_alpha, barHeight)
-                charge_widget.fill.Color = charge_shot_bar_color
-                charge_widget.fill.Visible = true
-
-                charge_widget.text.Position = barPos + Vector2.new(barWidth / 2, -16)
-                charge_widget.text.Color = charge_shot_text_color
-                charge_widget.text.Text = string.format("CHARGE SHOT [%d / %d]", cur_b, max_b)
-                charge_widget.text.Visible = true
-            else
-                charge_widget.bg.Visible = false
-                charge_widget.fill.Visible = false
-                charge_widget.text.Visible = false
-                charge_shot_alpha = 0
-                charge_shot_display_alpha = 0
-                charge_shot_reset_pending = false
-            end
-        end)
 
         -- ─── AUTO REFILL MAG (ported verbatim from pin.reta V2) ───────────────
         -- Background loop: every 0.5s it walks the player's inventory containers,
@@ -6051,12 +5951,10 @@ end
                             -- Auto Reload: a shot is a useful clock for an ammo check.
                             if cheat._auto_reload_tick then pcall(cheat._auto_reload_tick) end
                             local charged_shots = 1
-                            -- Honour the Charge Shot keybind as well as the toggle: the
-                            -- bind gates whether the charge is actually applied.
+                            -- ONE TAP: there is no charge ramp to read any more, so the
+                            -- full burst goes out with a single shot.
                             if feature_active(charge_shot_enabled, 'gunmods_chargeshot_key') then
-                                local max_bullets = math.clamp(math.floor(charge_shot_bullets), 1, 15)
-                                charged_shots = math.clamp(math.floor((charge_shot_alpha * max_bullets) + 0.5), 1, max_bullets)
-                                charge_shot_reset_pending = true
+                                charged_shots = math.clamp(math.floor(charge_shot_bullets), 1, 15)
                             end
                             if charged_shots > 1 then
                                 for _ = 2, charged_shots do
@@ -6318,48 +6216,24 @@ end
         end})
 
     task.wait()
+        -- One Tap: a fixed 10-round burst in a single shot. The bullet-count slider and
+        -- the whole charge-bar control group (width / height / Y offset) are gone
+        -- along with the ramp they configured. The flag stays gunmods_chargeshot so
+        -- existing configs keep working.
         local charge_shot_toggle = gunmodbox:AddToggle('gunmods_chargeshot', {
-            Text = 'Charge Shot',
+            Text = 'One Tap',
             Default = false,
+            Tooltip = 'fires 10 rounds in a single shot -- nothing to charge',
             Callback = function(v)
                 charge_shot_enabled = v == true
-                if not charge_shot_enabled then
-                    charge_shot_alpha = 0
-                    charge_shot_display_alpha = 0
-                    charge_shot_reset_pending = false
-                    last_charge_shot_active = false
-                    charge_widget.bg.Visible = false
-                    charge_widget.fill.Visible = false
-                    charge_widget.text.Visible = false
-                end
             end
         })
         charge_shot_key = charge_shot_toggle:AddKeyPicker('gunmods_chargeshot_key', {
             Default = 'None',
             SyncToggleState = true,
             Mode = 'Toggle',
-            Text = 'Charge Shot key',
+            Text = 'One Tap key',
             NoUI = false
-        })
-        gunmodbox:AddSlider('gunmods_chargeshot_bullets', {
-            Text = 'Charge Shot Bullets',
-            Default = 10, Min = 1, Max = 15, Rounding = 0,
-            Callback = function(v) charge_shot_bullets = v end
-        })
-        gunmodbox:AddSlider('gunmods_chargeshot_width', {
-            Text = 'Charge Bar Width',
-            Default = 100, Min = 40, Max = 300, Rounding = 0,
-            Callback = function(v) charge_shot_bar_width = v end
-        })
-        gunmodbox:AddSlider('gunmods_chargeshot_height', {
-            Text = 'Charge Bar Height',
-            Default = 6, Min = 2, Max = 30, Rounding = 0,
-            Callback = function(v) charge_shot_bar_height = v end
-        })
-        gunmodbox:AddSlider('gunmods_chargeshot_offset', {
-            Text = 'Charge Bar Y Offset',
-            Default = 58, Min = -200, Max = 300, Rounding = 0,
-            Callback = function(v) charge_shot_bar_offset = v end
         })
         gunmodbox:AddToggle('gunmods_instantreload', {Text = 'Instant Reload', Default = false, Callback = function(v)
             cheat._instant_reload = v and true or false
