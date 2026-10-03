@@ -3071,12 +3071,13 @@
 
         key = tostring(key or "None")
         if key == "" or key == "None" or key == "NONE" then
-            -- No bind assigned: the feature stays OFF. A missing bind must never let
-            -- the feature auto-activate -- with no key there is nothing to hold or
-            -- toggle, so the feature is inert until a key is actually assigned.
-            -- ("Always" mode stays on by design.)
+            -- The DELIBERATE "no key chosen" state (a genuinely missing key already
+            -- returned false above). Returning false unconditionally here -- as this
+            -- briefly did -- turned every bind-gated feature inert until a key was
+            -- assigned, so TP Kill (whose config stores Key = "None") could never
+            -- activate at all. Strictness is opt-in per caller via require_assigned.
             if mode == "Always" then return true end
-            return false
+            return require_assigned ~= true
         end
 
         if mode == "Always" then return true end
@@ -8014,7 +8015,9 @@ end
             -- what read as buggy. Then treat the target as triggerable only once the
             -- server's LastVerifiedPos has converged on the teleport (cheat.wallbang_tp.apply).
             -- Flags live on silent_aim because this chunk is at Lua's local ceiling.
-            silent_aim._wallbang_bind_active = feature_active(silent_aim.wallbang_tp, 'wallbang_tp_bind')
+            -- require_assigned = true: Wallbang TP is the one feature that must have a
+            -- real bound key, so the toggle alone can never move the character.
+            silent_aim._wallbang_bind_active = feature_active(silent_aim.wallbang_tp, 'wallbang_tp_bind', false, true)
             if silent_aim._wallbang_bind_active and cheat.wallbang_tp.target_in_fov()
                 and not silent_aim.isvisible and not silent_aim.hitscanning then
                 local solved = cheat.wallbang_tp.solve(Camera.CFrame.p, silent_aim.target_part.Position)
