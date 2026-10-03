@@ -5348,6 +5348,42 @@ end
             return best, best_loaded
         end
 
+        -- Which magazine is IN the gun right now, and how many rounds does it hold?
+        -- Verified live on this build: the equipped weapon is NOT a Tool parented to the
+        -- character (char:FindFirstChildOfClass("Tool") is nil), so the old lookup bailed
+        -- on every single call and auto reload never ran. The gun is reached through
+        -- GameplayVariables.EquippedTool -> Inventory.<weapon>, and the loaded magazine is
+        -- an item inside that weapon's Attachments folder carrying the live count in a
+        -- LoadedAmmo attribute -- the same number the EquippedItem HUD label shows as N/M
+        -- (e.g. Attachments.9x18MakarovMAG with LoadedAmmo = 1 while the HUD reads 1/8).
+        local function auto_reload_current_mag()
+            local player_folder = ReplicatedStorage:FindFirstChild("Players")
+            local pf = player_folder and player_folder:FindFirstChild(LocalPlayer.Name)
+            local status = pf and pf:FindFirstChild("Status")
+            local gv = status and status:FindFirstChild("GameplayVariables")
+            local equipped = gv and gv:FindFirstChild("EquippedTool") and gv.EquippedTool.Value
+            local weapon_name = equipped and equipped.Name
+            local inventory = local_game_data and local_game_data.Inventory
+            local container = weapon_name and inventory and _FindFirstChild(inventory, weapon_name)
+            if not container then return nil, nil, nil end
+            local attachments = _FindFirstChild(container, "Attachments")
+            local fallback_mag, fallback_loaded = nil, nil
+            if attachments then
+                for _, att in ipairs(attachments:GetChildren()) do
+                    local la = att:GetAttribute("LoadedAmmo")
+                    if la ~= nil then
+                        if att:GetAttribute("Slot") == "Magazine" then
+                            return att, la, container.Value
+                        end
+                        if fallback_loaded == nil then
+                            fallback_mag, fallback_loaded = att, la
+                        end
+                    end
+                end
+            end
+            return fallback_mag, fallback_loaded, container.Value
+        end
+
         local function auto_reload_tick()
             if not cheat._auto_reload then return end
             if auto_reload_inflight then return end
@@ -5356,17 +5392,18 @@ end
             task.spawn(function()
                 -- let the shot apply and the server replicate the new LoadedAmmo
                 task.wait(0.08)
-                local char = LocalPlayer.Character
-                local tool = char and char:FindFirstChildOfClass("Tool")
-                if not tool then auto_reload_inflight = false return end
-                local wpn = tool:FindFirstChild("ItemProperties") or tool
-                local mag, loaded = auto_reload_find_mag(wpn)
-                -- Reload once the magazine has dropped to the configured count.
-                -- Threshold 0 reproduces the old dry-only behaviour.
+                local in_gun, current, template = auto_reload_current_mag()
+                if current == nil then auto_reload_inflight = false return end
+                -- Reload once the magazine in the gun has dropped to the configured
+                -- count. Threshold 0 reproduces the old dry-only behaviour.
                 local threshold = tonumber(cheat._auto_reload_at) or 0
-                if mag and loaded ~= nil and loaded <= threshold then
-                    cheat._auto_reload_last = tick()
-                    pcall(function() reload_remote:InvokeServer(nil, 1, mag) end)
+                if current <= threshold then
+                    -- the magazine to load FROM is a compatible spare in the inventory
+                    local spare, spare_loaded = auto_reload_find_mag(template)
+                    if spare and spare_loaded ~= nil and spare_loaded > 0 then
+                        cheat._auto_reload_last = tick()
+                        pcall(function() reload_remote:InvokeServer(nil, 1, spare) end)
+                    end
                 end
                 auto_reload_inflight = false
             end)
