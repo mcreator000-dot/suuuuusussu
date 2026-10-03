@@ -80,24 +80,60 @@
     -- We route mouse-button names to a valid, never-physically-produced KeyCode, so the
     -- lookups return a value instead of throwing and the storm stops at the source.
     do
-        local ok_mt, keycode_mt = pcall(function() return getrawmetatable(Enum.KeyCode) end)
-        if ok_mt and type(keycode_mt) == "table" then
-            local orig_index = rawget(keycode_mt, "__index")
-            local mouse_names = {
-                MouseButton1 = true, MouseButton2 = true, MouseButton3 = true,
-                MouseButton4 = true, MouseButton5 = true, MouseWheel = true,
-            }
-            keycode_mt.__index = function(enum_t, key)
-                if type(key) == "string" and mouse_names[key] then
-                    -- A valid KeyCode that no keyboard/mouse input ever reports,
-                    -- so IsKeyDown(...) simply reads "not held" and input.KeyCode
-                    -- comparisons never falsely match.
-                    return Enum.KeyCode.ButtonA
-                end
-                if orig_index then
-                    return orig_index(enum_t, key)
-                end
+        local mouse_names = {
+            MouseButton1 = true, MouseButton2 = true, MouseButton3 = true,
+            MouseButton4 = true, MouseButton5 = true, MouseWheel = true,
+        }
+        local orig_index = nil
+        local recursing = false
+        -- A valid KeyCode that no keyboard/mouse input ever reports, so IsKeyDown(...)
+        -- reads "not held" and input.KeyCode comparisons never falsely match.
+        local substitute = Enum.KeyCode.ButtonA
+
+        local function safe_index(enum_t, key)
+            if not recursing and type(key) == "string" and mouse_names[key] then
+                return substitute
+            end
+            if not orig_index then
                 return nil
+            end
+            recursing = true
+            local ok, res = pcall(orig_index, enum_t, key)
+            recursing = false
+            if ok then
+                return res
+            end
+            -- preserve the genuine "not a valid member" error for every other name
+            error(res, 0)
+        end
+
+        -- hookmetamethod copes with the READ-ONLY enum metatable. Writing
+        -- getrawmetatable(Enum.KeyCode).__index directly throws
+        -- "attempt to modify a readonly table".
+        local hooked = false
+        local ok_hook, orig = pcall(function()
+            return hookmetamethod(Enum.KeyCode, "__index", safe_index)
+        end)
+        if ok_hook and type(orig) == "function" then
+            orig_index = orig
+            hooked = true
+        end
+
+        if not hooked then
+            -- Fallback: unprotect the metatable when the executor exposes setreadonly.
+            local ok_mt, keycode_mt = pcall(function() return getrawmetatable(Enum.KeyCode) end)
+            if ok_mt and type(keycode_mt) == "table" then
+                pcall(function()
+                    if isreadonly(keycode_mt) then
+                        setreadonly(keycode_mt, false)
+                    end
+                end)
+                orig_index = rawget(keycode_mt, "__index")
+                local ok_set = pcall(function()
+                    keycode_mt.__index = safe_index
+                end)
+                pcall(function() setreadonly(keycode_mt, true) end)
+                hooked = ok_set
             end
         end
     end
