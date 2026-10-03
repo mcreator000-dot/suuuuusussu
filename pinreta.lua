@@ -5285,6 +5285,11 @@ end
         -- already calls. So: when a shot is created, start a short watchdog on the
         -- active weapon; if its magazine reads empty, invoke Reload for it.
         local auto_reload_inflight = false
+        -- How many rounds left in the magazine should trigger a reload. 0 keeps the
+        -- original behaviour (only when completely dry). Read live so the slider
+        -- takes effect immediately; the ammo figure itself comes from the magazine
+        -- slot's LoadedAmmo attribute, which is the same number the HUD draws.
+        cheat._auto_reload_at = 0
 
         -- Find the magazine the equipped weapon is actually using. Verified layout:
         -- the gun's own container (e.g. "Makarov") has NO Inventory child and carries
@@ -5336,15 +5341,31 @@ end
                 if not tool then auto_reload_inflight = false return end
                 local wpn = tool:FindFirstChild("ItemProperties") or tool
                 local mag, loaded = auto_reload_find_mag(wpn)
-                -- Only fire when every compatible magazine is dry; otherwise the
-                -- magazine swap is the game's job and we would fight it.
-                if mag and loaded ~= nil and loaded <= 0 then
+                -- Reload once the magazine has dropped to the configured count.
+                -- Threshold 0 reproduces the old dry-only behaviour.
+                local threshold = tonumber(cheat._auto_reload_at) or 0
+                if mag and loaded ~= nil and loaded <= threshold then
+                    cheat._auto_reload_last = tick()
                     pcall(function() reload_remote:InvokeServer(nil, 1, mag) end)
                 end
                 auto_reload_inflight = false
             end)
         end
         cheat._auto_reload_tick = auto_reload_tick
+
+        -- The tick used to run only from the create-bullet hook, so once the magazine
+        -- was empty there were no more shots to clock it and a reload the server
+        -- rejected was never retried. Poll as well, rate limited, so a reload always
+        -- eventually lands.
+        task.spawn(function()
+            while cheat.alive do
+                task.wait(0.5)
+                if cheat._auto_reload and not auto_reload_inflight
+                    and (tick() - (cheat._auto_reload_last or 0)) > 0.6 then
+                    pcall(auto_reload_tick)
+                end
+            end
+        end)
 
         -- instant reload
         if fps_reloadtypes then
@@ -6233,6 +6254,14 @@ end
         gunmodbox:AddToggle('gunmods_autoreload', {Text = 'Auto Reload', Default = false, Callback = function(v)
             cheat._auto_reload = v and true or false
         end})
+        -- Reload early instead of waiting for the magazine to run dry.
+        gunmodbox:AddSlider('gunmods_autoreload_at', {
+            Text = 'Auto Reload At',
+            Default = 0, Min = 0, Max = 30, Rounding = 0,
+            Suffix = ' bullets', Compact = true,
+            Tooltip = 'reload once this many rounds are left in the magazine (0 = only when empty)',
+            Callback = function(v) cheat._auto_reload_at = v end
+        })
         gunmodbox:AddToggle('gunmods_autorefillmag', {Text = 'Auto Refill Mag', Default = false, Callback = function(v)
             auto_refill_mag = v
         end})
