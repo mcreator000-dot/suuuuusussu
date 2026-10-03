@@ -594,6 +594,11 @@
         getfiles(false, assets.list)
     end
     cheat = {
+        -- MUST exist and start true. Every background loop guards on `while cheat.alive`
+        -- and spawn_damage_number tears its drawing down on `not cheat.alive`, so with the
+        -- field missing (nil) the damage numbers were removed on their very first frame
+        -- and Auto Refill Mag / the report display / the weather tracker never ran at all.
+        alive = true,
         Library = nil,
         Toggles = nil,
         Options = nil,
@@ -1019,6 +1024,9 @@
         cheat.utility.unload = function()
             if cheat.unloaded then return end
             cheat.unloaded = true
+            -- Stop the `while cheat.alive` background loops too, otherwise they keep
+            -- polling the game after an unload.
+            cheat.alive = false
             for _, toggle in pairs(cheat.Toggles or {}) do
                 if toggle and toggle.SetValue then
                     pcall(function() toggle:SetValue(false) end)
@@ -3780,6 +3788,45 @@
             end
             plr.connection = cheat.utility.new_renderstepped(function(delta)
                 local plr = loaded_plrs[player]
+
+                -- Damage Numbers / kill effect are their OWN features, so the health
+                -- tracking runs BEFORE the ESP visibility gate below. In pin.reta V2 this
+                -- block sat AFTER `if not settings.enabled then return end`, so damage
+                -- numbers silently required ESP to be switched on. The detection itself is
+                -- V2's: a health drop on a target, attributed to us only when a hitmarker
+                -- sound landed within the last 0.25s.
+                character = isnpc and player or not isnpc and player.Character
+                humanoid = character and _FindFirstChildOfClass(character, "Humanoid")
+                head = character and _FindFirstChild(character, "Head")
+                if isnpc and character and (character.Name == "MI24V" or character.Name == "BTR80") then
+                    head = character:FindFirstChild("CollisionPilot", true) or character:FindFirstChild("Mi24_Prop_M", true)
+                    humanoid = humanoid or { Health = character:GetAttribute("Health") or 1000, MaxHealth = 1000, Parent = character }
+                end
+                if character and character.Parent and humanoid and head then
+                    local dmg_now = os.clock()
+                    if not plr._next_dmg_check or dmg_now >= plr._next_dmg_check then
+                        plr._next_dmg_check = dmg_now + 0.05
+                        local hp = humanoid.Health
+                        if plr.last_health and hp < plr.last_health then
+                            local hitmarker_recent = cheat.utility.last_hitmarker_tick
+                                and (tick() - cheat.utility.last_hitmarker_tick < 0.25)
+                            if hitmarker_recent then
+                                local dmg = plr.last_health - hp
+                                if cheat.Toggles.killeffect and cheat.Toggles.killeffect.Value then
+                                    pcall(function() cheat.utility.spawn_kill_effect(head.Position) end)
+                                end
+                                if cheat.damagenumbers_enabled
+                                    or (cheat.Toggles.damagenumbers and cheat.Toggles.damagenumbers.Value) then
+                                    if cheat.utility.spawn_damage_number then
+                                        pcall(function() cheat.utility.spawn_damage_number(head.Position, dmg) end)
+                                    end
+                                end
+                            end
+                        end
+                        plr.last_health = hp
+                    end
+                end
+
                 if not settings.enabled then
                     if not plr._esp_disabled then
                         esp_table.update_player_chams(player, false)
@@ -3844,30 +3891,6 @@
                 end
                 plr._next_esp_update = frame_now + update_interval
                 local humanoid_health = humanoid.Health
-                
-                if plr.last_health and humanoid_health < plr.last_health then
-                    local hitmarker_recent = cheat.utility.last_hitmarker_tick and (tick() - cheat.utility.last_hitmarker_tick < 0.25)
-                    if hitmarker_recent then
-                        local dmg = plr.last_health - humanoid_health
-                        if cheat.Toggles.killeffect and cheat.Toggles.killeffect.Value then
-                            cheat.utility.spawn_kill_effect(head.Position)
-                        end
-                        -- Damage Numbers: only for hits we actually caused
-                        -- (hitmarker_recent), exactly like pin.reta V2. The hitmarker
-                        -- timestamp now really is populated because the sound scan that
-                        -- sets it also runs for Damage Numbers alone (see
-                        -- sound_features_active). The old _pending_damage fallback that
-                        -- used to live here printed every observed health drop --
-                        -- enemy-vs-enemy, fall and bleed damage included -- and is gone.
-                        if cheat.damagenumbers_enabled
-                            or (cheat.Toggles.damagenumbers and cheat.Toggles.damagenumbers.Value) then
-                            if cheat.utility.spawn_damage_number then
-                                cheat.utility.spawn_damage_number(head.Position, dmg)
-                            end
-                        end
-                    end
-                end
-                plr.last_health = humanoid_health
 
                 if humanoid_health <= 0 then
                     if not plr.was_dead then
