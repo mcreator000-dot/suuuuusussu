@@ -80,6 +80,8 @@
     -- We route mouse-button names to a valid, never-physically-produced KeyCode, so the
     -- lookups return a value instead of throwing and the storm stops at the source.
     do
+        -- Cached BEFORE hooking, so the hook body itself never performs an enum lookup.
+        local KEYCODE_ENUM = Enum.KeyCode
         local mouse_names = {
             MouseButton1 = true, MouseButton2 = true, MouseButton3 = true,
             MouseButton4 = true, MouseButton5 = true, MouseWheel = true,
@@ -88,13 +90,19 @@
         local recursing = false
         -- A valid KeyCode that no keyboard/mouse input ever reports, so IsKeyDown(...)
         -- reads "not held" and input.KeyCode comparisons never falsely match.
-        local substitute = Enum.KeyCode.ButtonA
+        local substitute = KEYCODE_ENUM.ButtonA
 
         local function safe_index(enum_t, key)
-            if not recursing and type(key) == "string" and mouse_names[key] then
+            -- Scope guard is ESSENTIAL: every Roblox enum shares ONE __index, so without it
+            -- the substitution also fired for Enum.UserInputType and handed a KeyCode to
+            -- IsMouseButtonPressed -> "Unable to cast KeyCode to UserInputType".
+            if enum_t == KEYCODE_ENUM and not recursing and type(key) == "string" and mouse_names[key] then
                 return substitute
             end
-            if not orig_index then
+            -- Delegate ONLY to the captured original. Never call a METHOD on the enum in
+            -- here: GetEnumItems and friends are reached through this same hooked __index,
+            -- so calling one recurses until every enum lookup in the game breaks.
+            if type(orig_index) ~= "function" then
                 return nil
             end
             recursing = true
@@ -107,16 +115,32 @@
             error(res, 0)
         end
 
-        -- hookmetamethod copes with the READ-ONLY enum metatable. Writing
-        -- getrawmetatable(Enum.KeyCode).__index directly throws
-        -- "attempt to modify a readonly table".
+        -- Reuse the TRUE original across re-executions. hookmetamethod returns whatever
+        -- __index is currently installed, so re-running the script would otherwise chain
+        -- our own hook onto itself, one layer deeper on every execute.
+        local genv = (getgenv and getgenv()) or _G
+        local store = type(genv) == "table" and rawget(genv, "__GHOST_ENUM_KEYCODE") or nil
         local hooked = false
-        local ok_hook, orig = pcall(function()
-            return hookmetamethod(Enum.KeyCode, "__index", safe_index)
-        end)
-        if ok_hook and type(orig) == "function" then
-            orig_index = orig
-            hooked = true
+
+        if type(store) == "table" and type(store.orig) == "function" then
+            orig_index = store.orig
+            hooked = pcall(function()
+                hookmetamethod(KEYCODE_ENUM, "__index", safe_index)
+            end)
+        else
+            -- hookmetamethod copes with the READ-ONLY enum metatable. Writing
+            -- getrawmetatable(Enum.KeyCode).__index directly throws
+            -- "attempt to modify a readonly table".
+            local ok_hook, orig = pcall(function()
+                return hookmetamethod(KEYCODE_ENUM, "__index", safe_index)
+            end)
+            if ok_hook and type(orig) == "function" then
+                orig_index = orig
+                hooked = true
+                if type(genv) == "table" then
+                    pcall(function() rawset(genv, "__GHOST_ENUM_KEYCODE", { orig = orig }) end)
+                end
+            end
         end
 
         if not hooked then
@@ -128,7 +152,9 @@
                         setreadonly(keycode_mt, false)
                     end
                 end)
-                orig_index = rawget(keycode_mt, "__index")
+                if not orig_index then
+                    orig_index = rawget(keycode_mt, "__index")
+                end
                 local ok_set = pcall(function()
                     keycode_mt.__index = safe_index
                 end)
