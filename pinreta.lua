@@ -6646,7 +6646,15 @@ end
         -- pin.reta V2 behaviour.
         salobox:AddToggle('silentaim_wallbang_tp', {Text = 'Wallbang TP', Default = false, Tooltip = 'teleports you past the wall for one frame and fires only once the server has verified the new position', Callback = function(v)
             silent_aim.wallbang_tp = v
-        end})
+        end}):AddKeyPicker('wallbang_tp_bind', {
+            -- Hold: the teleport only runs while the key is down. No Callback, so
+            -- the bind never touches the master toggle.
+            Default = 'None',
+            SyncToggleState = false,
+            Mode = 'Hold',
+            Text = 'Wallbang TP',
+            NoUI = false
+        })
         
         salobox:AddToggle('silentaim_corner', {Text = 'Corner Shoot',Default = false,Callback = function(first)
             silent_aim.corner_shoot = first
@@ -7215,6 +7223,22 @@ end
         wait_max = 0.18,    -- stop waiting for the server after this long
         settle = 0.05,      -- hold the spoof this long past convergence
     }
+
+    -- Is silent aim's LOCKED target actually inside the FOV circle? Used to gate the
+    -- teleport so it cannot fire off a stale or peripheral lock.
+    cheat.wallbang_tp.target_in_fov = function()
+        local target = silent_aim.target_part
+        if not target then return false end
+        local camera = workspace.CurrentCamera
+        if not camera then return false end
+        local sp, on_screen = _WorldToViewportPoint(camera, target.Position)
+        if not on_screen then return false end
+        if not silent_aim.fov then return true end
+        local vp = camera.ViewportSize
+        local dx = sp.X - (vp.X * 0.5)
+        local dy = sp.Y - (vp.Y * 0.5)
+        return math.sqrt(dx * dx + dy * dy) <= (silent_aim.fov_size or 100)
+    end
 
     cheat.wallbang_tp.last_verified_pos = function()
         local rp = ReplicatedStorage:FindFirstChild("Players")
@@ -7931,13 +7955,15 @@ end
                 cheat.shoot_weapon_packet(silent_aim.isvisible, shootspeed, packetpred, packetscan, packetthruscan)
             end
             
-            -- WALLBANG TP: arm the teleport for a target that is walled off, then treat it
-            -- as triggerable only once the server's LastVerifiedPos has converged on the
-            -- teleport (see cheat.wallbang_tp.apply). The origin is re-solved only when
-            -- it moves materially, so the convergence timer is not reset every frame. Kept
-            -- on its own toggle so silentaim_wallbang stays behaviourally identical to V2.
-            if silent_aim.wallbang_tp and silent_aim.target_part and not silent_aim.isvisible
-                and not silent_aim.hitscanning then
+            -- WALLBANG TP: arm ONLY while its keybind is down and a target is locked inside
+            -- the FOV circle. Before this it re-armed every frame and teleported you around
+            -- whenever anything was obstructed, even when you were not shooting -- which is
+            -- what read as buggy. Then treat the target as triggerable only once the
+            -- server's LastVerifiedPos has converged on the teleport (cheat.wallbang_tp.apply).
+            -- Flags live on silent_aim because this chunk is at Lua's local ceiling.
+            silent_aim._wallbang_bind_active = feature_active(silent_aim.wallbang_tp, 'wallbang_tp_bind')
+            if silent_aim._wallbang_bind_active and cheat.wallbang_tp.target_in_fov()
+                and not silent_aim.isvisible and not silent_aim.hitscanning then
                 local solved = cheat.wallbang_tp.solve(Camera.CFrame.p, silent_aim.target_part.Position)
                 if solved then
                     local prev = silent_aim._wallbang_origin
