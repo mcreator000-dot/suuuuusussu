@@ -4891,7 +4891,7 @@
  silent_aim = {
     -- pin.reta fields
     enabled = false, triggerbot = false, target_ai = false, target_heli = false,
-    testwallbang = false, part = "Head", random_part = false,
+    testwallbang = false, wallbang_tp = false, part = "Head", random_part = false,
     fov = false, fov_show = false, fov_fill = false, fov_color = Color3.new(1,1,1),
     fov_top_color = Color3.fromRGB(140,135,180), fov_bottom_color = Color3.fromRGB(45,45,45),
     fov_outline = false, fov_outline_color = Color3.new(0,0,0), fov_size = 100,
@@ -6631,10 +6631,21 @@ end
         bullet_tracers_box:AddSlider('tracer_thickness', { Text = 'Tracer Thickness', Default = 0.5, Min = 0.1, Max = 10, Rounding = 1, Compact = true, Callback = function(v) silent_aim.tracer_thickness = v end })
         bullet_tracers_box:AddSlider('tracer_lifetime', { Text = 'Tracer Lifetime', Default = 1, Min = 0.1, Max = 5, Rounding = 1, Compact = true, Callback = function(v) silent_aim.tracer_lifetime = v end })
         salobox:AddToggle('silentaim_wallbang', {Text = 'Wallbang',Default = false,Callback = function(first)
+            -- pin.reta V2 sets ONLY this flag. Ours additionally forced
+            -- silent_aim.isvisible = true, which made the triggerbot treat every
+            -- obstructed target as visible and fire through any wall of any
+            -- thickness. That, not the material raycast, was the real source of the
+            -- wallbang difference from V2, so it is gone.
             silent_aim.testwallbang = first
-            if first then
-                silent_aim.isvisible = true
-            end
+        end})
+
+        -- Wallbang TP: teleport the root just PAST the blocking wall for one window
+        -- and only let the trigger fire once the server's own UAC.LastVerifiedPos has
+        -- converged on that origin, so the shot is credited from beyond the
+        -- obstruction. A separate flag, so silentaim_wallbang keeps its exact
+        -- pin.reta V2 behaviour.
+        salobox:AddToggle('silentaim_wallbang_tp', {Text = 'Wallbang TP', Default = false, Tooltip = 'teleports you past the wall for one frame and fires only once the server has verified the new position', Callback = function(v)
+            silent_aim.wallbang_tp = v
         end})
         
         salobox:AddToggle('silentaim_corner', {Text = 'Corner Shoot',Default = false,Callback = function(first)
@@ -7188,8 +7199,125 @@ end
         return true
     end
 
+    -- --- WALLBANG TP: TELEPORT PAST THE WALL, GATED ON LastVerifiedPos ----------
+    -- Magic Bullet only fabricates the CLIENT-side collision result; the server still
+    -- rebuilds the shot origin from its own record, because the shot remote carries a
+    -- direction and not a position. That record is UAC.LastVerifiedPos. So Wallbang TP
+    -- moves the apex of the shot: solve an origin just PAST the blocking wall, teleport
+    -- the root onto it, and let the trigger fire only once LastVerifiedPos has actually
+    -- converged there -- firing earlier credits the shot from behind the wall.
+    --
+    -- Everything lives on cheat.wallbang_tp on purpose: this chunk already sits at Lua's
+    -- 200-local ceiling, so declaring locals here breaks compilation outright.
+    cheat.wallbang_tp = {
+        max_step = 40,      -- studs; refuse absurd teleports
+        tolerance = 3,      -- LastVerifiedPos must land this close to count
+        wait_max = 0.18,    -- stop waiting for the server after this long
+        settle = 0.05,      -- hold the spoof this long past convergence
+    }
+
+    cheat.wallbang_tp.last_verified_pos = function()
+        local rp = ReplicatedStorage:FindFirstChild("Players")
+        local p_folder = rp and rp:FindFirstChild(LocalPlayer.Name)
+        local status = p_folder and p_folder:FindFirstChild("Status")
+        local uac = status and status:FindFirstChild("UAC")
+        local pos = uac and uac:GetAttribute("LastVerifiedPos")
+        return typeof(pos) == "Vector3" and pos or nil
+    end
+
+    -- Walk the shot line to the first obstruction, step past its far face along the same
+    -- line, and accept the spot only if the target is genuinely exposed from there.
+    cheat.wallbang_tp.solve = function(cam_origin, target_pos)
+        if not (cam_origin and target_pos) then return nil end
+        local self = cheat.wallbang_tp
+        local filter = { LocalPlayer.Character, workspace.CurrentCamera }
+        local target_char = silent_aim.target_part and silent_aim.target_part.Parent
+        if target_char then table.insert(filter, target_char) end
+        local noc = workspace:FindFirstChild("NoCollision")
+        if noc then table.insert(filter, noc) end
+
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        params.IgnoreWater = true
+        params.FilterDescendantsInstances = filter
+
+        local ray = target_pos - cam_origin
+        if ray.Magnitude < 0.05 then return nil end
+        local hit = workspace:Raycast(cam_origin, ray, params)
+        if not (hit and hit.Instance) then return nil end   -- clear line: nothing to solve
+
+        local size = hit.Instance.Size
+        local thickness = math.min(size.X, size.Y, size.Z)
+        local candidate = hit.Position + ray.Unit * (thickness + 0.6)
+        if (candidate - cam_origin).Magnitude > self.max_step then return nil end
+
+        local probe = workspace:Raycast(candidate, target_pos - candidate, params)
+        if probe and probe.Instance then return nil end
+        return candidate
+    end
+
+    -- True once the server's own record has caught up with our teleport.
+    cheat.wallbang_tp.ready = function()
+        local self = cheat.wallbang_tp
+        local origin = silent_aim._wallbang_origin
+        local armed = silent_aim._wallbang_arm_tick
+        if not (origin and armed) then return false end
+        if tick() - armed > self.wait_max then return false end
+        local verified = self.last_verified_pos()
+        if not verified then return false end
+        return (verified - origin).Magnitude <= self.tolerance
+    end
+
+    cheat.wallbang_tp.clear = function()
+        silent_aim._wallbang_origin = nil
+        silent_aim._wallbang_arm_tick = nil
+        silent_aim._wallbang_ready = false
+    end
+
+    cheat.wallbang_tp.apply = function()
+        local self = cheat.wallbang_tp
+        -- recover first, exactly like the hitscan window
+        restore_hitscan_spoof(cheat._wallbang_restore_state, true)
+        cheat._wallbang_restore_state = nil
+
+        local origin = silent_aim._wallbang_origin
+        local armed = silent_aim._wallbang_arm_tick
+        if not (origin and armed) then return end
+        if tick() - armed > self.wait_max + self.settle then
+            self.clear()
+            return
+        end
+
+        local toggles = cheat.Toggles
+        if cheat.freecam_enabled
+            or (toggles and toggles.desync_enabled and toggles.desync_enabled.Value)
+            or (toggles and toggles.peek_blink and toggles.peek_blink.Value)
+            or (toggles and toggles.tpkill_enabled and toggles.tpkill_enabled.Value)
+        then
+            return
+        end
+
+        local camera = workspace.CurrentCamera
+        local character = LocalPlayer.Character
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        local target_part = silent_aim.target_part
+        if not (camera and root and target_part and target_part.Parent) then return end
+
+        local replicated_cframe = CFrame.new(origin, target_part.Position)
+        cheat._wallbang_restore_state = {
+            camera = camera,
+            camera_cframe = camera.CFrame,
+            root = root,
+            root_cframe = root.CFrame,
+            root_velocity = root.AssemblyLinearVelocity,
+            replicated_cframe = replicated_cframe,
+        }
+        root.CFrame = replicated_cframe
+    end
+
     cheat.utility.track_connection(RunService.Heartbeat:Connect(function()
         apply_hitscan_player_spoof()
+        cheat.wallbang_tp.apply()
     task.wait()
     end))
 
@@ -7803,18 +7931,45 @@ end
                 cheat.shoot_weapon_packet(silent_aim.isvisible, shootspeed, packetpred, packetscan, packetthruscan)
             end
             
+            -- WALLBANG TP: arm the teleport for a target that is walled off, then treat it
+            -- as triggerable only once the server's LastVerifiedPos has converged on the
+            -- teleport (see cheat.wallbang_tp.apply). The origin is re-solved only when
+            -- it moves materially, so the convergence timer is not reset every frame. Kept
+            -- on its own toggle so silentaim_wallbang stays behaviourally identical to V2.
+            if silent_aim.wallbang_tp and silent_aim.target_part and not silent_aim.isvisible
+                and not silent_aim.hitscanning then
+                local solved = cheat.wallbang_tp.solve(Camera.CFrame.p, silent_aim.target_part.Position)
+                if solved then
+                    local prev = silent_aim._wallbang_origin
+                    if not prev or (prev - solved).Magnitude > 1.5 then
+                        silent_aim._wallbang_origin = solved
+                        silent_aim._wallbang_arm_tick = tick()
+                    end
+                else
+                    cheat.wallbang_tp.clear()
+                end
+            else
+                cheat.wallbang_tp.clear()
+            end
+            silent_aim._wallbang_ready = cheat.wallbang_tp.ready()
+
             -- Triggerability matches pin.reta V2 exactly: the target is visible, or we are
             -- hitscanning (a trace that needs no line of sight), plus a manipulated origin.
-            -- The Wallbang toggle does NOT belong here: in V2 it only gates Silent Aim's
-            -- force-collision result, never the triggerbot. The material/thin-wall raycast
-            -- that used to sit here made Wallbang silently let the triggerbot shoot through
-            -- thin Wood/Plastic/Metal/Glass/Concrete walls, which V2 never does.
+            -- The Wallbang toggle itself does NOT belong here: in V2 it gates only Silent
+            -- Aim's force-collision result. The material/thin-wall raycast that used to sit
+            -- here made Wallbang silently let the triggerbot shoot through thin
+            -- Wood/Plastic/Metal/Glass/Concrete walls, which V2 never does.
             local triggerable = silent_aim.isvisible or silent_aim.hitscanning
             if silent_aim.triggerbot_manipulation and silent_aim.manipulated_origin ~= nil then
-            triggerable = true
+                triggerable = true
+            end
+            -- Wallbang TP contributes exactly one thing: the shot is allowed once the server
+            -- has verified the teleported origin, so it is credited from past the wall.
+            if silent_aim._wallbang_ready then
+                triggerable = true
             end
             if rage_active then
-            triggerable = true  -- rage bot fires on lock; Auto Wallbang still gates it below
+                triggerable = true  -- rage bot fires on lock; Auto Wallbang still gates it below
             end
             
             if trigger_active and not triggerable and now - last_triggerable_scan >= fast_target_scan_interval then
@@ -7860,7 +8015,8 @@ end
 
                 -- Rage bot wallbang check
                 if should_trigger and rage_active and not silent_aim.isvisible
-                    and not silent_aim.hitscanning and not silent_aim.rage_bot_wallbang then
+                    and not silent_aim.hitscanning and not silent_aim.rage_bot_wallbang
+                    and not silent_aim._wallbang_ready then
                     should_trigger = false
                 end
             end
