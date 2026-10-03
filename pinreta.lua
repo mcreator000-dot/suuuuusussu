@@ -7222,21 +7222,73 @@ end
     cheat.tpkill = {
         tolerance = 4,
         wait_max = 0.45,
+        -- One frame after the trigger actually presses. A literal 1 ms is below
+        -- Roblox's 16.7 ms frame, so the shot would never be discharged; one frame
+        -- is the shortest window that still lands the round.
+        settle = 0.02,
+        -- Safety net: if nothing ever fired, do not hang above the target.
+        max_hold = 0.15,
     }
     cheat.tpkill.destination = nil
     cheat.tpkill.arm_tick = nil
     cheat.tpkill.verified = false
+    cheat.tpkill.verified_at = nil
+    cheat.tpkill.fired_at = nil
+    cheat.tpkill.returning = false
 
     cheat.tpkill.arm = function(destination)
         cheat.tpkill.destination = destination
         cheat.tpkill.arm_tick = tick()
         cheat.tpkill.verified = false
+        cheat.tpkill.verified_at = nil
+        cheat.tpkill.fired_at = nil
+        cheat.tpkill.returning = false
     end
 
     cheat.tpkill.clear = function()
         cheat.tpkill.destination = nil
         cheat.tpkill.arm_tick = nil
         cheat.tpkill.verified = false
+        cheat.tpkill.verified_at = nil
+        cheat.tpkill.fired_at = nil
+        cheat.tpkill.returning = false
+    end
+
+    -- Snap back to the recorded position the moment the round is away. Runs on the same
+    -- heartbeat as the wallbang window; it never waits for the toggle.
+    cheat.tpkill.update = function()
+        local self = cheat.tpkill
+        if self.returning then return end
+        local dest = self.destination
+        local armed = self.arm_tick
+        if not (dest and armed) then return end
+
+        local now = tick()
+        if not self.verified then
+            local lvp = cheat.wallbang_tp.last_verified_pos()
+            if lvp and (lvp - dest).Magnitude <= self.tolerance then
+                self.verified = true
+            elseif now - armed > self.wait_max then
+                self.verified = true   -- give up waiting and shoot anyway
+            end
+        end
+        if self.verified and not self.verified_at then
+            self.verified_at = now
+        end
+
+        -- the trigger presses only once triggerable clears, i.e. after verification
+        if silent_aim._trigger_held and not self.fired_at then
+            self.fired_at = now
+        end
+
+        local done = self.fired_at and (now - self.fired_at) >= self.settle
+        local stalled = self.verified_at and (now - self.verified_at) >= self.max_hold
+        if not (done or stalled) then return end
+
+        self.returning = true
+        if cheat._tpkill_force_off then
+            pcall(cheat._tpkill_force_off)
+        end
     end
 
     -- true while a teleport is still waiting for the server. Once verified (or once the
@@ -7262,6 +7314,7 @@ end
     cheat.utility.track_connection(RunService.Heartbeat:Connect(function()
         apply_hitscan_player_spoof()
         cheat.wallbang_tp.apply()
+        cheat.tpkill.update()
     task.wait()
     end))
 
@@ -18307,6 +18360,17 @@ end})
                     if root then root.AssemblyLinearVelocity = Vector3.new(0, 0, 0) end
                     if hum then hum:ChangeState(Enum.HumanoidStateType.Landed) end
                 end
+            end
+        end
+
+        -- Called by cheat.tpkill.update once the round is away, so the teleport ends
+        -- itself instead of lasting until the toggle is switched off by hand. Goes
+        -- through the toggle so the UI state stays in sync with tpkill_enabled.
+        cheat._tpkill_force_off = function()
+            if cheat.Toggles and cheat.Toggles.tpkill_enabled then
+                cheat.Toggles.tpkill_enabled:SetValue(false)
+            else
+                setTPKillActive(false)
             end
         end
 
