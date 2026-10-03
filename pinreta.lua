@@ -7803,50 +7803,19 @@ end
                 cheat.shoot_weapon_packet(silent_aim.isvisible, shootspeed, packetpred, packetscan, packetthruscan)
             end
             
-    local triggerable = false
-    if silent_aim.isvisible then
-        triggerable = true
-    elseif silent_aim.testwallbang and silent_aim.target_part then
-        -- Perform a raycast from the origin (camera or manipulated) to the target
-        local origin = silent_aim.manipulated_origin or Camera.CFrame.p
-        local targetPos = silent_aim.target_part.Position
-        local direction = targetPos - origin
-        local rayParams = RaycastParams.new()
-        -- Exclude local player, camera, NoCollision, AND the target's character
-        local targetChar = silent_aim.target_part.Parent
-        local filterList = {LocalPlayer.Character, Camera, workspace.NoCollision}
-        if targetChar then
-            table.insert(filterList, targetChar)
-        end
-        rayParams.FilterDescendantsInstances = filterList
-        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-        local result = workspace:Raycast(origin, direction, rayParams)
-        if result and result.Instance then
-            local hitPart = result.Instance
-            local material = hitPart.Material
-            -- Define bangable materials (add or remove as needed)
-            local bangableMaterials = {
-                Enum.Material.Wood,
-                Enum.Material.WoodPlanks,
-                Enum.Material.Plastic,
-                Enum.Material.Metal,
-                Enum.Material.Glass,
-                Enum.Material.Concrete,
-            }
-            -- Check if the wall is thin (smallest axis < 2 studs)
-            local size = hitPart.Size
-            local minAxis = math.min(size.X, size.Y, size.Z)
-            if table.find(bangableMaterials, material) and minAxis < 2 then
-                triggerable = true
+            -- Triggerability matches pin.reta V2 exactly: the target is visible, or we are
+            -- hitscanning (a trace that needs no line of sight), plus a manipulated origin.
+            -- The Wallbang toggle does NOT belong here: in V2 it only gates Silent Aim's
+            -- force-collision result, never the triggerbot. The material/thin-wall raycast
+            -- that used to sit here made Wallbang silently let the triggerbot shoot through
+            -- thin Wood/Plastic/Metal/Glass/Concrete walls, which V2 never does.
+            local triggerable = silent_aim.isvisible or silent_aim.hitscanning
+            if silent_aim.triggerbot_manipulation and silent_aim.manipulated_origin ~= nil then
+            triggerable = true
             end
-        end
-    end
-    if silent_aim.triggerbot_manipulation and silent_aim.manipulated_origin ~= nil then
-        triggerable = true
-    end
-    if rage_active then
-        triggerable = true  -- rage bot always shoots if target is locked
-    end
+            if rage_active then
+            triggerable = true  -- rage bot fires on lock; Auto Wallbang still gates it below
+            end
             
             if trigger_active and not triggerable and now - last_triggerable_scan >= fast_target_scan_interval then
                 last_triggerable_scan = now
@@ -7890,7 +7859,8 @@ end
                 end
 
                 -- Rage bot wallbang check
-                if should_trigger and rage_active and not silent_aim.isvisible and not silent_aim.rage_bot_wallbang then
+                if should_trigger and rage_active and not silent_aim.isvisible
+                    and not silent_aim.hitscanning and not silent_aim.rage_bot_wallbang then
                     should_trigger = false
                 end
             end
