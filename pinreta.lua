@@ -7724,7 +7724,12 @@ end
 
             local active_target_interval = (rage_active or trigger_active or tp_tbot or autoshoot) and fast_target_scan_interval or target_scan_interval
             local target_invalid = silent_aim.target_part ~= nil and not target_part_alive(silent_aim.target_part)
-            if now - last_target_scan >= active_target_interval or target_invalid then
+            -- TP Kill lifts us ~200 studs above the target, which pushes it out of the
+            -- FOV circle get_closest_target measures in screen space against the mouse, so
+            -- the next re-scan dropped the target and nothing ever fired. While a TP Kill
+            -- window is live, keep the lock (still re-scan if the target actually died).
+            if (now - last_target_scan >= active_target_interval or target_invalid)
+                and not (cheat.tpkill and cheat.tpkill.destination and not target_invalid) then
                 last_target_scan = now
                 local scan_part = silent_aim.selected_part or silent_aim.part
 
@@ -7988,7 +7993,13 @@ end
                 end
             end
 
-            local should_trigger = (trigger_active or rage_active or tp_tbot) and silent_aim.target_part and triggerable
+            -- The verified TP Kill window counts as its own trigger source, so TP Kill
+            -- shoots for itself instead of silently doing nothing unless the separate
+            -- Auto Triggerbot toggle also happens to be on.
+            local should_trigger = (trigger_active or rage_active or tp_tbot
+                or (cheat.tpkill and cheat.tpkill.destination and cheat.tpkill.verified
+                    and not cheat.tpkill.returning))
+                and silent_aim.target_part and triggerable
             if should_trigger then
                 -- Rage bot uses its own hitchance
                 local hitChance
@@ -11634,6 +11645,66 @@ end
         local visuals_BloomSize = 17
         local visuals_BloomThreshold = 0.9
         local visuals_BloomEnabled = false
+        -- Ported from pin.reta V2 ("teleport vehicle next to me"), made generic:
+        -- instead of hard-coding the UAZ chassis it grabs the nearest model that has a
+        -- VehicleSeat. Sits you in it, then pivots the whole vehicle to where you stood.
+        WorldTab:AddButton('Teleport Vehicle To Me', function()
+            local char = LocalPlayer.Character
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if not (hrp and hum) then return end
+        
+            local best_model, best_seat, best_dist = nil, nil, math.huge
+            local containers = {}
+            local vroot = workspace:FindFirstChild("Vehicles")
+            if vroot then table.insert(containers, vroot) end
+            table.insert(containers, workspace)
+            for _, container in ipairs(containers) do
+                for _, v in ipairs(container:GetChildren()) do
+                    if v:IsA("Model") then
+                        local seat = v:FindFirstChild("VehicleSeat", true)
+                        if seat then
+                            local d = (seat.Position - hrp.Position).Magnitude
+                            if d < best_dist then
+                                best_dist, best_model, best_seat = d, v, seat
+                            end
+                        end
+                    end
+                end
+            end
+        
+            if not (best_model and best_seat) then
+                cheat.Library:Notify("TP Car", "No vehicle with a VehicleSeat found.")
+                return
+            end
+        
+            local old_cf = hrp.CFrame
+            hrp.CFrame = best_seat.CFrame * CFrame.new(0, 1, 0)
+            task.wait(0.1)
+            pcall(function() best_seat:Sit(hum) end)
+            task.spawn(function()
+                local seated = false
+                for _ = 1, 50 do
+                    if hum.SeatPart == best_seat then seated = true break end
+                    task.wait(0.05)
+                end
+                if seated then
+                    task.wait(0.2)
+                    pcall(function() best_model:PivotTo(old_cf * CFrame.new(0, 3, 0)) end)
+                    for _, part in ipairs(best_model:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.AssemblyLinearVelocity = Vector3.zero
+                            part.AssemblyAngularVelocity = Vector3.zero
+                        end
+                    end
+                    cheat.Library:Notify("TP Car", "Teleported " .. best_model.Name)
+                else
+                    hrp.CFrame = old_cf
+                    cheat.Library:Notify("TP Car", "Seating failed -- check for a VehicleSeat.")
+                end
+            end)
+        end)
+        
         WorldTab:AddToggle('enabletimechanger', {Text = 'Time Changer',Default = false,Callback = function(first)
             globals.EnableTime = first
         end})
