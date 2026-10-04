@@ -14211,9 +14211,10 @@ end})
         mvb:AddSlider('omni_sprint_speed', { Text = 'Omni Sprint Speed', Default = 18, Min = 16, Max = 18.2, Rounding = 1, Compact = true, Suffix = ' st/s', Tooltip = 'walk speed applied while sprinting in any direction', Callback = function(v)
             cheat._omni_sprint_speed = v
         end})
+        -- Matches pin.reta V2 exactly: no keybind on this one, the toggle alone drives it.
         mvb:AddToggle('speedhack_enabled', {Text = 'Speed Hack',Default = false,Callback = function(first)
             speed_enabled = first
-        end}):AddKeyPicker('speedhack_bind', {Default = 'None', SyncToggleState = true, Mode = 'Toggle', Text = 'Speed Hack', NoUI = false})
+        end})
         mvb:AddSlider('speedhack_speed',{ Text = 'Speed', Default = 18.2, Min = 10, Max = 22, Rounding = 1, Suffix = "sps", Compact = false }):OnChanged(function(State)
             speed = State
         end)
@@ -14535,7 +14536,7 @@ end})
             -- runs before physics/replication, so this value is what gets sent out.
             -- No restore logic and no hook protection, by design.
             -- Honor the Speed Hack keybind as well as the toggle.
-            if feature_active(speed_enabled, 'speedhack_bind') then
+            if speed_enabled then
                 local char = LocalPlayer.Character
                 local humanoid = char and _FindFirstChildOfClass(char, "Humanoid")
                 if humanoid then
