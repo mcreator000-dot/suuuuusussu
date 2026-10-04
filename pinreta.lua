@@ -5952,29 +5952,27 @@ end
                                 if type(old_melee_def) ~= "function" then return false end
                                 if seen_melee_fns[old_melee_def] then return false end
                                 seen_melee_fns[old_melee_def] = true
-                                cheat.utility.new_hook(old_melee_def, LPH_JIT_MAX(function(old, self, ...)
-                                    -- Copied verbatim from pin.reta V2. The important part is
-                                    -- passing self.weapon THROUGH: it is the ObjectValue, and
-                                    -- StartSwing resolves it itself (V2's own reach wrapper checks
-                                    -- p2:IsA("ObjectValue") then reads p2.Value). Ours unwrapped it
-                                    -- to self.weapon.Value first, handing StartSwing a bare instance
-                                    -- it does not expect -- that is why no melee cooldown did
-                                    -- nothing here while it works in V2.
-                                    -- The one deviation kept is `and cheat.ui_ready`: it only holds
-                                    -- the swing until the menu is built and prevents the
-                                    -- FunctionLibraryExtension:156 error storm seen at load.
-                                    if no_melee_cooldown and self and cheat.ui_ready then
-                                        self.useDebounce = false
-                                        local attack_type = "NormalAttack"
-                                        if self.altUseCounter == 1 and self.clientAnimationTracks.UseAlt then
-                                            attack_type = "NormalAttack"
+                                                                    -- Raw hookfunction with a plain Lua closure: this is the exact
+                                    -- form of the probe that was verified working in game (2 copies
+                                    -- hooked, StartSwing ok=true, cooldown gone). cheat.utility.new_hook
+                                    -- with usecclosure=true wraps the body in newcclosure, and the
+                                    -- plain-closure form is what actually fired. No cheat.ui_ready gate
+                                    -- either -- V2 has none, and the probe had none.
+                                    local old_melee_hook
+                                    old_melee_hook = hookfunction(old_melee_def, function(self, ...)
+                                        if no_melee_cooldown and self then
+                                            self.useDebounce = false
+                                            local attack_type = "NormalAttack"
+                                            if self.altUseCounter == 1 and self.clientAnimationTracks
+                                                and self.clientAnimationTracks.UseAlt then
+                                                attack_type = "NormalAttack"
+                                            end
+                                            pcall(function()
+                                                melee_module:StartSwing(self.weapon, self.worldModel, self.viewModel, attack_type, self.SprintStrafe)
+                                            end)
                                         end
-                                        pcall(function()
-                                            melee_module:StartSwing(self.weapon, self.worldModel, self.viewModel, attack_type, self.SprintStrafe)
-                                        end)
-                                    end
-                                    return old(self, ...)
-                                end), true)
+                                        return old_melee_hook(self, ...)
+                                    end)
                                 return true
                             end
                             -- the gc table currently being scanned by the outer loop
