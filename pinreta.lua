@@ -5953,19 +5953,25 @@ end
                                 if seen_melee_fns[old_melee_def] then return false end
                                 seen_melee_fns[old_melee_def] = true
                                 cheat.utility.new_hook(old_melee_def, LPH_JIT_MAX(function(old, self, ...)
+                                    -- Copied verbatim from pin.reta V2. The important part is
+                                    -- passing self.weapon THROUGH: it is the ObjectValue, and
+                                    -- StartSwing resolves it itself (V2's own reach wrapper checks
+                                    -- p2:IsA("ObjectValue") then reads p2.Value). Ours unwrapped it
+                                    -- to self.weapon.Value first, handing StartSwing a bare instance
+                                    -- it does not expect -- that is why no melee cooldown did
+                                    -- nothing here while it works in V2.
+                                    -- The one deviation kept is `and cheat.ui_ready`: it only holds
+                                    -- the swing until the menu is built and prevents the
+                                    -- FunctionLibraryExtension:156 error storm seen at load.
                                     if no_melee_cooldown and self and cheat.ui_ready then
                                         self.useDebounce = false
-                                        -- Driving StartSwing while the weapon ObjectValue
-                                        -- was still unloaded fed a half-built weapon into
-                                        -- the game's Effects script and error-stormed it
-                                        -- (FunctionLibraryExtension:156 GetAttribute nil).
-                                        local weapon_ref = typeof(self.weapon) == "Instance"
-                                            and (self.weapon:IsA("ObjectValue") and self.weapon.Value or self.weapon)
-                                        if weapon_ref then
-                                            pcall(function()
-                                                melee_module:StartSwing(weapon_ref, self.worldModel, self.viewModel, "NormalAttack", self.SprintStrafe)
-                                            end)
+                                        local attack_type = "NormalAttack"
+                                        if self.altUseCounter == 1 and self.clientAnimationTracks.UseAlt then
+                                            attack_type = "NormalAttack"
                                         end
+                                        pcall(function()
+                                            melee_module:StartSwing(self.weapon, self.worldModel, self.viewModel, attack_type, self.SprintStrafe)
+                                        end)
                                     end
                                     return old(self, ...)
                                 end), true)
