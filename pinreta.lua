@@ -5958,21 +5958,23 @@ end
                                     -- with usecclosure=true wraps the body in newcclosure, and the
                                     -- plain-closure form is what actually fired. No cheat.ui_ready gate
                                     -- either -- V2 has none, and the probe had none.
-                                    local old_melee_hook
-                                    old_melee_hook = hookfunction(old_melee_def, function(self, ...)
+                                                                        -- Copied EXACTLY from pin.reta V2 (line for line, including
+                                    -- new_hook(..., true)). The only surrounding difference is the
+                                    -- getgc sweep that finds the function, because this build keeps
+                                    -- MeleeWeaponDefault in gc tables rather than on a module.
+                                    cheat.utility.new_hook(old_melee_def, LPH_JIT_MAX(function(old, self, ...)
                                         if no_melee_cooldown and self then
                                             self.useDebounce = false
                                             local attack_type = "NormalAttack"
-                                            if self.altUseCounter == 1 and self.clientAnimationTracks
-                                                and self.clientAnimationTracks.UseAlt then
+                                            if self.altUseCounter == 1 and self.clientAnimationTracks.UseAlt then
                                                 attack_type = "NormalAttack"
                                             end
                                             pcall(function()
                                                 melee_module:StartSwing(self.weapon, self.worldModel, self.viewModel, attack_type, self.SprintStrafe)
                                             end)
                                         end
-                                        return old_melee_hook(self, ...)
-                                    end)
+                                        return old(self, ...)
+                                    end), true)
                                 return true
                             end
                             -- the gc table currently being scanned by the outer loop
