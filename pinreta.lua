@@ -14619,6 +14619,96 @@ end})
             end
         end))
         local misctab = ui.box.misc:AddTab('Misc')
+    -- ─── All Equipment ────────────────────────────────────────────────────────
+    -- Rebuilds the equipment row (map / compass / GPS / radio) by writing proper
+    -- inventory entries. Verified live against the server's own items: an entry is
+    -- an ObjectValue named after the item whose .Value points at the ItemsList
+    -- template, carrying a Slot attribute -- e.g. the server-granted DV2 is exactly
+    -- ObjectValue + Slot=Melee with no children. The template's
+    -- ItemProperties.SlotType supplies the slot name.
+    --
+    -- Every flag lives on `cheat` on purpose: the main chunk sits at Lua's 200-local
+    -- ceiling and declaring locals here is what produced
+    -- "Out of local registers when trying to allocate ..." before.
+    --
+    -- Two things this deliberately does NOT do: touch the Lighter (excluded), and
+    -- insert a KeyChain -- that slot is cleared instead.
+    --
+    -- Client-side: the panel renders this folder, so the items show. Equipping
+    -- itself is server-side (GameplayVariables.EquipId / EquippedTool are what the
+    -- game reads, and the server rejects items it does not believe you own), so
+    -- expect these to appear rather than become functional gear.
+    cheat._all_equipment = false
+    cheat.all_equipment_specs = {
+        { slot = 'EquipmentMap',     pick = 'EstonianBorderMap', force = true },
+        { slot = 'EquipmentCompass', pick = 'Pathfinder' },
+        { slot = 'EquipmentGPS',     pick = 'PDA' },
+        { slot = 'EquipmentRadio',   pick = 'Radio' },
+    }
+    cheat.clear_equipment_slots = { 'EquipmentKeyChain' }
+
+    cheat.apply_all_equipment = function()
+        local items_list = ReplicatedStorage:FindFirstChild('ItemsList')
+        local players_rs = ReplicatedStorage:FindFirstChild('Players')
+        local pf = players_rs and players_rs:FindFirstChild(LocalPlayer.Name)
+        local inventory = pf and pf:FindFirstChild('Inventory')
+        if not (items_list and inventory) then return 0 end
+
+        local function occupant(slot)
+            for _, e in ipairs(inventory:GetChildren()) do
+                if tostring(e:GetAttribute('Slot')) == slot then return e end
+            end
+            return nil
+        end
+
+        for _, slot in ipairs(cheat.clear_equipment_slots) do
+            local e = occupant(slot)
+            if e then pcall(function() e:Destroy() end) end
+        end
+
+        local count = 0
+        for _, spec in ipairs(cheat.all_equipment_specs) do
+            local template = items_list:FindFirstChild(spec.pick)
+            if template then
+                local e = occupant(spec.slot)
+                if e and e.Name ~= template.Name then
+                    pcall(function() e:Destroy() end)
+                    e = nil
+                end
+                if not e then
+                    local entry = Instance.new('ObjectValue')
+                    entry.Name = template.Name
+                    entry.Value = template
+                    entry:SetAttribute('Slot', spec.slot)
+                    pcall(function()
+                        local ip = template:FindFirstChild('ItemProperties')
+                        if ip then
+                            local d = ip:GetAttribute('Durability')
+                            if d ~= nil then entry:SetAttribute('Durability', d) end
+                            local md = ip:GetAttribute('MaxDurability')
+                            if md ~= nil then entry:SetAttribute('MaxDurability', md) end
+                        end
+                    end)
+                    entry.Parent = inventory
+                    count = count + 1
+                end
+            end
+        end
+        return count
+    end
+
+    -- Idempotent: only ever creates what is missing, so re-running cannot duplicate
+    -- or clobber gear. Re-applied on a slow timer because a respawn makes the server
+    -- send a fresh inventory that drops client-side additions.
+    task.spawn(function()
+        while cheat.alive do
+            task.wait(3)
+            if cheat._all_equipment and cheat.apply_all_equipment then
+                pcall(cheat.apply_all_equipment)
+            end
+        end
+    end)
+
         misctab:AddToggle('silentaim_indicator', {Text = 'Target Info Panel',Default = false,Callback = function(first)
             silent_aim.indicator = first
         end}):AddColorPicker('tipanel_bgcolor', {Default = tipanel_settings.bgcolor,Title = 'Panel BG Color',Transparency = 0.1,Callback = function(Value)
@@ -14650,7 +14740,25 @@ end})
         end)
 
         -- ─── Melee (ported from pin.reta V2) ──────────────────────────────────
-        misctab:AddToggle('gunmods_nomeleecooldown', {Text = 'No Melee Cooldown', Default = false, Callback = function(v)
+        misctab:AddToggle('all_equipment', {
+        Text = 'All Equipment',
+        Default = false,
+        Tooltip = 'restores the equipment row: Borderline map, Pathfinder, PDA, Radio (no Lighter, no KeyChain)',
+        Callback = function(v)
+            cheat._all_equipment = v == true
+            if cheat._all_equipment and cheat.apply_all_equipment then
+                local n = 0
+                pcall(function() n = cheat.apply_all_equipment() end)
+                if cheat.Library and cheat.Library.Notify then
+                    pcall(function()
+                        cheat.Library:Notify('All Equipment', tostring(n) .. ' slot(s) restored')
+                    end)
+                end
+            end
+        end
+    })
+
+    misctab:AddToggle('gunmods_nomeleecooldown', {Text = 'No Melee Cooldown', Default = false, Callback = function(v)
             no_melee_cooldown = v
         end})
         misctab:AddToggle('gunmods_meleereach', {Text = 'Melee Reach', Default = false, Callback = function(v)
