@@ -5987,6 +5987,33 @@ end
                             -- which the gc never exposes, and let the outer loop handle
                             -- every gc-visible copy via the current `gc` table below.
                             local okfps, fps_mod = pcall(function() return require(ReplicatedStorage.Modules.FPS) end)
+                            -- ── Direct MeleeWeaponDefault sweep ────────────────────────────
+                            -- Verified live on this build: NO ModuleScript in ReplicatedStorage
+                            -- exposes MeleeWeaponDefault (every one was required and checked) and
+                            -- the Melee module holds only StartSwing, so the function lives in just
+                            -- two gc tables. Hooking it cannot rely on the outer scan happening to
+                            -- iterate one of them -- and _reach_hooked being true proves nothing,
+                            -- because the reach wrapper below is set unguarded on the block's first
+                            -- pass. That is why No Melee Cooldown did nothing while V2's works.
+                            -- One guarded walk, deduped via seen_melee_fns, so this is not the
+                            -- nested per-table rescan that caused the load freeze.
+                            if not cheat._melee_swept then
+                                cheat._melee_swept = true
+                                cheat._melee_wrap = wrap_melee
+                                for _, t in ipairs(getgc(true)) do
+                                    if type(t) == "table" then
+                                        local fn = rawget(t, "MeleeWeaponDefault")
+                                        if type(fn) == "function" and not seen_melee_fns[fn] then
+                                            if wrap_melee(fn) then
+                                                cheat._melee_hooked_any = true
+                                            end
+                                        end
+                                    end
+                                end
+                                print("[GHOST] MeleeWeaponDefault sweep hooked = "
+                                    .. tostring(cheat._melee_hooked_any))
+                            end
+
                             if okfps and type(fps_mod) == "table" then
                                 wrap_melee(rawget(fps_mod, "MeleeWeaponDefault"))
                             end
@@ -14650,6 +14677,26 @@ end})
     -- itself is server-side (GameplayVariables.EquipId / EquippedTool are what the
     -- game reads, and the server rejects items it does not believe you own), so
     -- expect these to appear rather than become functional gear.
+    -- Re-sweep for a fresh MeleeWeaponDefault after a respawn. Bounded and off the main
+    -- path; wrap_melee dedupes, so already-wrapped functions are skipped.
+    task.spawn(function()
+        while cheat.alive do
+            task.wait(3)
+            if cheat._melee_wrap and cheat._melee_swept then
+                pcall(function()
+                    for _, t in ipairs(getgc(true)) do
+                        if type(t) == "table" then
+                            local fn = rawget(t, "MeleeWeaponDefault")
+                            if type(fn) == "function" then
+                                cheat._melee_wrap(fn)
+                            end
+                        end
+                    end
+                end)
+            end
+        end
+    end)
+
     cheat._all_equipment = false
     cheat.all_equipment_specs = {
         { slot = 'EquipmentMap',     pick = 'EstonianBorderMap', force = true },
