@@ -5963,7 +5963,24 @@ end
                                     -- getgc sweep that finds the function, because this build keeps
                                     -- MeleeWeaponDefault in gc tables rather than on a module.
                                     cheat.utility.new_hook(old_melee_def, LPH_JIT_MAX(function(old, self, ...)
-                                        if no_melee_cooldown and self then
+                                        -- The menu value and this local can disagree: the library
+                                        -- restores saved config values on load WITHOUT invoking the
+                                        -- toggle Callback, so gunmods_nomeleecooldown reads true while
+                                        -- no_melee_cooldown is still false -- the feature looks on and
+                                        -- does nothing. Verified live: the toggle read true while the
+                                        -- hook was inert. Fall back to the live element, which is the
+                                        -- same source the working probe effectively forced.
+                                        local ncd_live = no_melee_cooldown
+                                        if not ncd_live then
+                                            local ncd_el = getgenv().Toggles
+                                                and getgenv().Toggles.gunmods_nomeleecooldown
+                                            if type(ncd_el) == "table" then
+                                                ncd_live = (ncd_el.Value == true) or (ncd_el.value == true)
+                                            elseif ncd_el == true then
+                                                ncd_live = true
+                                            end
+                                        end
+                                        if ncd_live and self then
                                             self.useDebounce = false
                                             local attack_type = "NormalAttack"
                                             if self.altUseCounter == 1 and self.clientAnimationTracks.UseAlt then
