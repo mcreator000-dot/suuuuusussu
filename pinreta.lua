@@ -14206,6 +14206,11 @@ end})
         mvb:AddToggle('omni_sprint', {Text = 'Omni Sprint', Default = false, Callback = function(first)
             omni_sprint = first
         end})
+        -- Speed Omni Sprint forces while you are moving. Kept on cheat rather than a
+        -- new local: this chunk is at Lua's 200-local ceiling.
+        mvb:AddSlider('omni_sprint_speed', { Text = 'Omni Sprint Speed', Default = 18, Min = 16, Max = 18.2, Rounding = 1, Compact = true, Suffix = ' st/s', Tooltip = 'walk speed applied while sprinting in any direction', Callback = function(v)
+            cheat._omni_sprint_speed = v
+        end})
         mvb:AddToggle('speedhack_enabled', {Text = 'Speed Hack',Default = false,Callback = function(first)
             speed_enabled = first
         end}):AddKeyPicker('speedhack_bind', {Default = 'None', SyncToggleState = true, Mode = 'Toggle', Text = 'Speed Hack', NoUI = false})
@@ -14547,7 +14552,7 @@ end})
                 if omni_sprint and humanoid.MoveDirection.Magnitude > 0 then
                     local playergui = LocalPlayer.PlayerGui
                     if playergui and playergui:FindFirstChild("MainGui") then
-                        humanoid.WalkSpeed = 18
+                        humanoid.WalkSpeed = cheat._omni_sprint_speed or 18
                     end
                 end
             end
