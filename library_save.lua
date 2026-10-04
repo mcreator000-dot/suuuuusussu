@@ -52,11 +52,11 @@ local SaveManager = {} do
 		},
 		KeyPicker = {
 			Save = function(idx, object)
-				return { type = 'KeyPicker', idx = idx, mode = object.Mode, key = object.Value }
+				return { type = 'KeyPicker', idx = idx, Key = (type(object.Value) == 'table' and (object.Value.Key or object.Value.key or object.Value[1]) or object.Value), Type = object.Mode or (type(object.Value) == 'table' and (object.Value.Type or object.Value.type or object.Value[2])) or 'Hold', mode = object.Mode, key = object.Value }
 			end,
 			Load = function(idx, data)
 				if Options[idx] then 
-					Options[idx]:SetValue({ data.key, data.mode })
+					Options[idx]:SetValue({ Key = (data.Key or data.key or data[1]), Type = (data.Type or data.type or data.mode or data[2]), key = (data.Key or data.key or data[1]), mode = (data.Type or data.type or data.mode or data[2]) })
 				end
 			end,
 		},

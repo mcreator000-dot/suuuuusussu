@@ -2737,7 +2737,7 @@ function library.new(libraryTitle, cfgLocation)
 		keyValue.Type = keyValue.Type or "Hold"
 		keyValue.Active = keyValue.Type == "Always"
 	elseif type(newValue) == "table" then
-		local restoredType = newValue.Type or newValue.type or "Hold"
+		local restoredType = newValue.Type or newValue.type or newValue.Mode or newValue.mode or newValue[2] or "Hold"
 		-- A bind may only come up active if its mode is "Always".
 		-- Hold/Toggle always start released, so no feature is enabled on load.
 		keyValue.Key = newValue.Key or newValue.key or newValue.Bind or newValue.bind or newValue[1] or "NONE"
