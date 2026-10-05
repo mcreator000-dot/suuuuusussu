@@ -2779,9 +2779,11 @@ local enumBind = keyNameToEnum(keyValue.Key, keyValue.KeyType)
 								end
 
 								inlineMode.Sync()
-								elseif not cb then
-									keyCallback(keyValue)
 								end
+								-- Always notify the host so its cached Key/Mode stay in sync with what we restored.
+								-- On a config load this callback used to be skipped, so the host's stale (empty) cache was
+								-- written back over the bind by its own release/feature checks, clearing the key.
+								if keyCallback then pcall(keyCallback, keyValue) end
 							end
 
 							registerElement(tab.tab_num, section.name, sector.name, extraFlag, keybindObject)
