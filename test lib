@@ -2000,8 +2000,15 @@ function library.new(libraryTitle, cfgLocation)
 				for sectorName, elements in pairs(sectors) do
 					for flag, element in pairs(elements) do
 						local loaded = getLoadedValue(tabNum, sectionName, sectorName, flag)
-						if loaded == nil and element._configKind == "Keybind" and flag == "Toggle Menu Key" then
-							loaded = getLoadedValue(tabNum, sectionName, sectorName, "$Toggle Menu Key")
+						if loaded == nil and element._configKind == "Keybind" then
+							-- Inline binds are SAVED under "$<Text> <owner flag>" (storeKey prefixes the owner's key
+							-- with $), but this lookup was hardcoded to the menu-toggle key only. Every other inline
+							-- bind therefore loaded as nil, set_value was never called, and its Key/Mode never
+							-- restored -- the config held the key while the bind kept showing NONE / default mode.
+							loaded = getLoadedValue(tabNum, sectionName, sectorName, "$" .. flag)
+							if loaded == nil and flag == "Toggle Menu Key" then
+								loaded = getLoadedValue(tabNum, sectionName, sectorName, "$Toggle Menu Key")
+							end
 						end
 						if forceKeybindsHold and element._configKind == "Keybind" then
 							loaded = forceHoldKeybindValue(loaded, element)
