@@ -2763,7 +2763,22 @@ local enumBind = keyNameToEnum(keyValue.Key, keyValue.KeyType)
 								end
 
 								if inlineMode then
-									inlineMode.Sync()
+									if inlineBinder then
+									-- A config load updated keyValue and bound the key, but the inline key box
+									-- kept showing the stale/NONE text -- only the MODE widget was synced below.
+									-- Refresh the displayed key too, tolerating whichever text child mclib uses.
+									pcall(function()
+										local shown = (keyValue.Key and keyValue.Key ~= '') and keyValue.Key or 'NONE'
+										local textObj = inlineBinder
+										if not (textObj:IsA('TextLabel') or textObj:IsA('TextButton')) then
+											textObj = inlineBinder:FindFirstChildWhichIsA('TextLabel', true)
+												or inlineBinder:FindFirstChildWhichIsA('TextButton', true)
+										end
+										if textObj then textObj.Text = shown end
+									end)
+								end
+
+								inlineMode.Sync()
 								elseif not cb then
 									keyCallback(keyValue)
 								end
