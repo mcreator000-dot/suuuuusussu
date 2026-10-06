@@ -21090,6 +21090,10 @@ end
                                                         -- let the art run into the top bar as well
                                                         if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
                                                     elseif d:IsA("ImageLabel") and d.Name ~= "FunctionsBackground"
+                                                        -- TabSwitchersBackground is the SIDEBAR backdrop (asset 104673673037299, swapped in
+                                                        -- commit 651cf94 "Swap the sidebar backdrop asset"). Blanking it hid the sidebar art,
+                                                        -- so it is excluded and shows exactly as before.
+                                                        and d.Name ~= "TabSwitchersBackground"
                                                         and string.sub(d.Name, -10) == "Background"
                                                         and as.X >= 100 and as.Y >= 50 then
                                                         -- the theme's OWN backdrop art (TabSwitchersBackground over the
