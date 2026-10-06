@@ -5556,7 +5556,7 @@ end
                     -- Reuse the same folder variable for gameplayvars instead of adding a local
                     -- (the chunk sits at Luau's 200-local ceiling).
                     local local_gameplayvars = local_game_data and local_game_data:FindFirstChild("Status")
-                        and local_game_data.Status:FindFirstChild("GameplayVariables")
+                        and local_game_data:FindFirstChild("Status") and local_game_data:FindFirstChild("Status"):FindFirstChild("GameplayVariables")
 
                     -- fps_module â€” same require swim uses for update_fps upvalue extraction
                     local fps_module = require(ReplicatedStorage.Modules.FPS)
@@ -5583,7 +5583,7 @@ end
                         local compatable_mags = fps_object.itemProperties and fps_object.itemProperties.CompatibleMagazines
                         if not compatable_mags then return nil, 0 end
                         if not local_game_data or not local_game_data:FindFirstChild("Inventory") then return nil, 0 end
-                        for _, container in local_game_data.Inventory:GetChildren() do
+                        for _, container in (local_game_data:FindFirstChild("Inventory") and local_game_data:FindFirstChild("Inventory"):GetChildren() or {}) do
                             local inventory = _FindFirstChild(container, "Inventory")
                             if not inventory then continue end
                             for _, item in inventory:GetChildren() do
@@ -5688,7 +5688,7 @@ end
                         local preferred_ammo  = item_properties and item_properties:GetAttribute("PreferredAmmo")
                         if not compatible_ammo then return nil, 0 end
                         if not local_game_data or not local_game_data:FindFirstChild("Inventory") then return nil, 0 end
-                        for _, container in local_game_data.Inventory:GetChildren() do
+                        for _, container in (local_game_data:FindFirstChild("Inventory") and local_game_data:FindFirstChild("Inventory"):GetChildren() or {}) do
                             local inventory = _FindFirstChild(container, "Inventory")
                             if not inventory then continue end
                             for _, item in inventory:GetChildren() do
@@ -5731,7 +5731,7 @@ end
                         if not wpn then return nil end
                         local compat = wpn:FindFirstChild("CompatibleMagazines")
                             or (wpn.ItemProperties and wpn.ItemProperties:FindFirstChild("CompatibleMagazines"))
-                        local containers = local_game_data and local_game_data.Inventory
+                        local containers = local_game_data and local_game_data:FindFirstChild("Inventory")
                         if not containers then return nil end
                         local best, best_loaded = nil, nil
                         for _, container in ipairs(containers:GetChildren()) do
@@ -6114,7 +6114,7 @@ end
                                 pcall(function()
                                     if not local_game_data or not local_game_data:FindFirstChild("Inventory") then return end
                                     -- Scan all containers in inventory
-                                    for _, container in ipairs(local_game_data.Inventory:GetChildren()) do
+                                    for _, container in ipairs((local_game_data:FindFirstChild("Inventory") and local_game_data:FindFirstChild("Inventory"):GetChildren() or {})) do
                                         local inventory = _FindFirstChild(container, "Inventory")
                                         if not inventory then continue end
                                         for _, item in ipairs(inventory:GetChildren()) do
@@ -6140,7 +6140,7 @@ end
                                                     local foundAmmo = nil
 
                                                     if not local_game_data or not local_game_data:FindFirstChild("Inventory") then return end
-                                                    for _, c2 in ipairs(local_game_data.Inventory:GetChildren()) do
+                                                    for _, c2 in ipairs((local_game_data:FindFirstChild("Inventory") and local_game_data:FindFirstChild("Inventory"):GetChildren() or {})) do
                                                         local inv2 = _FindFirstChild(c2, "Inventory")
                                                         if not inv2 then continue end
                                                         for _, ammoItem in ipairs(inv2:GetChildren()) do
