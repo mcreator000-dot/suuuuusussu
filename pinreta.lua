@@ -21029,7 +21029,7 @@ end
                                 img.Name = "FunctionsBackground"
                                 img.Image = "rbxassetid://119739035168751"
                                 img.BackgroundTransparency = 1
-                                img.ScaleType = Enum.ScaleType.Crop
+                                img.ScaleType = Enum.ScaleType.Stretch
                                 img.ZIndex = 0
                                 img.Position = UDim2.fromOffset(x1 - bp.X, y1 - bp.Y)
                                 img.Size = UDim2.fromOffset(x2 - x1, y2 - y1)
@@ -21050,6 +21050,12 @@ end
                                                     local bp2 = b.AbsolutePosition
                                                     im.Position = UDim2.fromOffset(0, 0)   -- window-relative: art covers the top bar too
                                                     im.Size = UDim2.fromOffset(b.AbsoluteSize.X, b.AbsoluteSize.Y)
+                                            -- Stretch (not crop) so the art fills the entire window --
+                                            -- top bar and sidebar included -- instead of being cropped to
+                                            -- the panel area.
+                                            if im.ScaleType ~= Enum.ScaleType.Stretch then
+                                                im.ScaleType = Enum.ScaleType.Stretch
+                                            end
                                                 end
                                             end)
                                         end
