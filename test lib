@@ -1838,6 +1838,28 @@ function library.new(libraryTitle, cfgLocation)
 				end
 			end
 		end
+		-- The accent pass also paints things that were never captured into themeAccentDefaults:
+		-- UIStroke outlines, widget fills, icons and text. Those kept the custom colour after a
+		-- restore, which is why the outline and the toggle graphics stayed custom with the theme
+		-- already switched off (measured live: ON switches still 0.404,0.714,0.996).
+		if menu.gui then
+			for _, object in ipairs(menu.gui:GetDescendants()) do
+				pcall(function()
+					if typeof(object.Color) == "Color3" and object.Color == themeAccentColor then
+						object.Color = themeAccentPreviousColor
+					end
+					if typeof(object.BackgroundColor3) == "Color3" and object.BackgroundColor3 == themeAccentColor then
+						object.BackgroundColor3 = themeAccentPreviousColor
+					end
+					if typeof(object.ImageColor3) == "Color3" and object.ImageColor3 == themeAccentColor then
+						object.ImageColor3 = themeAccentPreviousColor
+					end
+					if typeof(object.TextColor3) == "Color3" and object.TextColor3 == themeAccentColor then
+						object.TextColor3 = themeAccentPreviousColor
+					end
+				end)
+			end
+		end
 	end
 
 	if menu.gui then
