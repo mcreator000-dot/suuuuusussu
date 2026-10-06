@@ -21186,6 +21186,12 @@
                 -- something when switched on (Cheaters Lobby calls teleportLobby), so re-applying
                 -- them at startup fired it over and over and froze the game.
                 cheat._config_loading = true
+                -- Watchdog: if anything between here and the clear below errors out, the flag would
+                -- stay set forever, which would silence every menu notification and make the
+                -- equipment / Cheaters Lobby callbacks no-op even when toggled by hand.
+                task.delay(25, function()
+                    cheat._config_loading = false
+                end)
                 -- Snapshot the current values BEFORE the config is applied, so the re-apply pass
                 -- can fire ONLY the entries the load actually changed. Blanket re-firing made
                 -- action-carrying features (Cheaters Lobby -> teleportLobby) run repeatedly.
