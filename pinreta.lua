@@ -21065,6 +21065,14 @@
                                                     if d.Name == "Topbar" then
                                                         -- let the art run into the top bar as well
                                                         if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
+                                                    elseif d:IsA("ImageLabel") and d.Name ~= "FunctionsBackground"
+                                                        and string.sub(d.Name, -10) == "Background"
+                                                        and as.X >= 100 and as.Y >= 50 then
+                                                        -- the theme's OWN backdrop art (TabSwitchersBackground over the
+                                                        -- sidebar, TopbarBackground over the header). Their
+                                                        -- BackgroundTransparency was already 1 -- ImageTransparency is
+                                                        -- what carries the picture, so two different images showed.
+                                                        if d.ImageTransparency < 1 then d.ImageTransparency = 1 end
                                                     elseif d.Name == "Divider" and as.X >= 500 and as.Y <= 2 then
                                                         -- the blue rule under the header (585x1, the only wide flat Divider)
                                                         if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
@@ -21073,13 +21081,14 @@
                                                             d.BackgroundTransparency = 1
                                                         end
                                                     elseif d.Parent and d.Parent.Name == "Toggle"
-                                                        and as.X >= 30 and as.X <= 80 and as.Y >= 12 and as.Y <= 30
-                                                        and d.BackgroundColor3.R + d.BackgroundColor3.G + d.BackgroundColor3.B < 1.2 then
-                                                        -- the toggle switch in its OFF state (dark). Matched by position
-                                                        -- and colour rather than name, and the brightness test keeps the
-                                                        -- ON state -- the bright accent red -- fully solid.
-                                                        if d.BackgroundTransparency < FADE then
-                                                            d.BackgroundTransparency = FADE
+                                                        and (d.Name == "Toggle" or d.Name == "TogglerHead")
+                                                        and as.X >= 10 and as.X <= 60 and as.Y >= 10 and as.Y <= 26 then
+                                                        -- The switch, read live: a "Toggle" ImageButton 34x18 nested in a
+                                                        -- row also named "Toggle", plus its "TogglerHead" knob 12x12.
+                                                        -- Both stay FULLY OPAQUE -- the older position/colour rule left
+                                                        -- the OFF state at 0.40 and nothing ever reset it.
+                                                        if d.BackgroundTransparency > 0 then
+                                                            d.BackgroundTransparency = 0
                                                         end
                                                     elseif (FADE_NAMES[d.Name] and as.X >= 100 and as.Y >= 10)
                                                         or (as.X >= 150 and as.Y >= 40 and d.Parent
