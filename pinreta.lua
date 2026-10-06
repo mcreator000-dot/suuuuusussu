@@ -6331,6 +6331,20 @@ end
                                         return returns
                                     end, true)
                                 end
+                                -- The melee hook intercepts the client melee path, so the game's own MeleeReplicate
+                                -- listener never gets installed and the engine logs "Remote event invocation discarded
+                                -- ... did you forget to implement OnClientEvent?" for every replicated melee. A no-op
+                                -- listener silences it and does not touch the hook behaviour.
+                                task.spawn(function()
+                                	pcall(function()
+                                		local remotes = ReplicatedStorage and ReplicatedStorage:FindFirstChild("Remotes")
+                                		local ev = remotes and remotes:FindFirstChild("MeleeReplicate")
+                                		if ev and ev:IsA("RemoteEvent") and not cheat._melee_repl_conn then
+                                			cheat._melee_repl_conn = ev.OnClientEvent:Connect(function() end)
+                                		end
+                                	end)
+                                end)
+
                                 -- Melee: hook EVERY gc table exposing MeleeWeaponDefault. The live game
                                 -- carries several distinct function objects for it (two in gc, and the
                                 -- require()d Modules.FPS exposes yet another), so hooking a single gc
@@ -21075,6 +21089,12 @@ end
                                                     if d:IsA("GuiObject") and d ~= cheat._functions_bg then
                                                         local as = d.AbsoluteSize
                                                         if d.Name == "Topbar" then
+                                                    elseif d:IsA("ImageLabel") and d.Name == "TabSwitchersBackground" then
+                                                        -- Sidebar backdrop: pinned to the OLD asset (139913314515436),
+                                                        -- the one 651cf94 swapped away from. Runtime-pinned so it wins
+                                                        -- regardless of patch order, and change the string to revert.
+                                                        local WANT_SIDEBAR = "rbxassetid://139913314515436"
+                                                        if d.Image ~= WANT_SIDEBAR then d.Image = WANT_SIDEBAR end
                                                             -- let the art run into the top bar as well
                                                             if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
                                                         elseif d:IsA("ImageLabel") and d.Name ~= "FunctionsBackground"
