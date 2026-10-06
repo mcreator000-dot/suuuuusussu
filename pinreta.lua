@@ -20760,7 +20760,15 @@
                 Default = false,
                 Callback = function(value)
                     if cheat.Library and cheat.Library._ghostMenu and cheat.Library._ghostMenu.SetThemeAccent then
-                        cheat.Library._ghostMenu.SetThemeAccent(value, cheat.Options.ThemeManager_CustomThemeColor and cheat.Options.ThemeManager_CustomThemeColor.Value or Color3.fromRGB(103, 182, 254))
+                        -- Pass a colour ONLY when enabling: passing it on disable made the library record the
+                        -- CUSTOM colour as the previous accent (themeAccentPreviousColor = themeAccentColor,
+                        -- themeAccentColor = colour), destroying the real one -- so switching the theme off
+                        -- restored the custom colour and the toggles / tab highlight stayed custom.
+                        if value then
+                        	cheat.Library._ghostMenu.SetThemeAccent(true, cheat.Options.ThemeManager_CustomThemeColor and cheat.Options.ThemeManager_CustomThemeColor.Value or Color3.fromRGB(103, 182, 254))
+                        else
+                        	cheat.Library._ghostMenu.SetThemeAccent(false)
+                        end
                     end
                 end
             }):AddColorPicker('ThemeManager_CustomThemeColor', {
@@ -20768,7 +20776,10 @@
                 Title = 'Accent Color',
                 Callback = function(color)
                     if cheat.Library and cheat.Library._ghostMenu and cheat.Library._ghostMenu.SetThemeAccent then
-                        cheat.Library._ghostMenu.SetThemeAccent(cheat.Toggles.ThemeManager_CustomTheme and cheat.Toggles.ThemeManager_CustomTheme.Value, color)
+                        -- Same rule: a colour change applies only while the theme is ON.
+                        if cheat.Toggles.ThemeManager_CustomTheme and cheat.Toggles.ThemeManager_CustomTheme.Value then
+                        	cheat.Library._ghostMenu.SetThemeAccent(true, color)
+                        end
                     end
                 end
             })
