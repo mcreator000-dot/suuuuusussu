@@ -21046,7 +21046,7 @@ end
                                                 local im = cheat._functions_bg
                                                 local b = im and im.Parent
                                                 local ct = b and b:FindFirstChild("Content", true)
-                                                if im and b then
+                                                if im and b and b.Visible ~= false and (b.Parent == nil or b.Parent.Enabled ~= false) then
                                                     local bp2 = b.AbsolutePosition
                                                     im.Position = UDim2.fromOffset(0, 0)   -- window-relative: art covers the top bar too
                                                     im.Size = UDim2.fromOffset(b.AbsoluteSize.X, b.AbsoluteSize.Y)
@@ -21081,7 +21081,10 @@ end
                                     for _, ch in ipairs(p:GetChildren()) do
                                         if ch:IsA("ScreenGui") then
                                             local base = ch:FindFirstChild("Base", true)
-                                            if base then
+                                            -- Only while the menu is actually OPEN. These rules only matter when it is on screen, and
+                                            -- during play this was a recurring full-descendant walk plus property writes: allocation
+                                            -- and GC pressure for a menu nobody is looking at.
+                                            if base and base.Visible ~= false and (base.Parent == nil or base.Parent.Enabled ~= false) then
                                                 -- By NAME, from the live hierarchy: these three hold the whole
                                                 -- functions area and are fully opaque, so they were what hid the
                                                 -- art -- and a geometry test on x missed them (they sit at 1129,
