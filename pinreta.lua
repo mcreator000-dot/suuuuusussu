@@ -21042,6 +21042,17 @@ end
                                 img.Size = UDim2.fromOffset(x2 - x1, y2 - y1)
                                 img.Parent = base
                                 cheat._functions_bg = img
+                            -- Clear the header in the SAME step that creates the art, not only from the
+                            -- visibility-gated rule pass: that pass is skipped while the menu is closed
+                            -- (ScreenGui.Enabled = false), which is exactly when the window gets built,
+                            -- so the opaque Topbar survived and covered the art. Verified live: a value
+                            -- set here sticks -- nothing re-sets it.
+                            pcall(function()
+                                local tb = base:FindFirstChild("Topbar", true)
+                                if tb and tb.BackgroundTransparency ~= 1 then tb.BackgroundTransparency = 1 end
+                                local tbb = base:FindFirstChild("TopbarBackground", true)
+                                if tbb and tbb.ImageTransparency ~= 1 then tbb.ImageTransparency = 1 end
+                            end)
                                 -- Re-sync every second so it stays edge-to-edge if the window is resized
                                 -- or the library re-lays out the panel.
                                 if not cheat._functions_bg_sync then
