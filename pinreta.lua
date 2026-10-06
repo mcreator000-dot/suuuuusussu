@@ -21158,7 +21158,10 @@ end
                                     end
                                 end
                             end)
-                            task.wait(0.5)   -- dropdowns are created lazily on open: poll fast enough to catch them at once
+                            -- 1.5s, not 0.5s: each pass walks every descendant of the window and writes properties,
+                        -- which is a periodic burst of allocation + GC -- a plausible source of micro-stutter.
+                        -- New dropdowns are corrected on the next pass at most 1.5s later.
+                        task.wait(1.5)
                         end
                     end)
                 end
