@@ -1903,6 +1903,18 @@ function library.new(libraryTitle, cfgLocation)
 		else
 			restoreThemeAccent()
 			syncInlineColorSwatches()
+			-- restoreThemeAccent only rewinds OBJECT properties; the library's own accent field kept
+			-- the custom colour, so the next repaint (a toggle switch changing state, a tab switch)
+			-- drew the custom accent again. Measured live with the theme already OFF: ON toggles were
+			-- still (0.404, 0.714, 0.996) = the custom accent 103,182,254.
+			pcall(function()
+				for key, value in pairs(menu) do
+					if typeof(value) == "Color3" and value == themeAccentColor then
+						menu[key] = themeAccentPreviousColor
+					end
+				end
+				themeAccentColor = themeAccentPreviousColor
+			end)
 		end
 		return true
 	end
