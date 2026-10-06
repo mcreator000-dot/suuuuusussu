@@ -16915,7 +16915,7 @@ end
                     
                     task.spawn(function()
                         local rep = ReplicatedStorage
-                        while task.wait(0.25) do
+                        while task.wait(0.25) do   -- when disabled it early-outs below with a 0.4s extra wait
                             pcall(function()
                                 if not skinchanger_enabled then
                                     task.wait(0.4)
