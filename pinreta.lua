@@ -1564,7 +1564,7 @@
                     task.wait(0.1)
                     _gate_waited = _gate_waited + 0.1
                 until game_is_loaded() or _gate_waited >= 30
-                print(string.format("[LOAD] gate: game ready after %.1fs (loaded=%s)", _gate_waited, tostring(game_is_loaded())))
+                if _G.__ghostLoadTrace then print(string.format("[LOAD] gate: game ready after %.1fs (loaded=%s)", _gate_waited, tostring(game_is_loaded()))) end
 
 -- 30 [LOAD] stage prints used to fire every execution: startup cost, and they buried real
 -- errors. Silent unless _G.__ghostLoadTrace = true.
@@ -2691,7 +2691,7 @@ end
                                         end
                                     end
                                     if pruned > 0 then
-                                        print("[config] pruned " .. pruned .. " stale entr(ies) from " .. tostring(name))
+                                        if _G.__ghostLoadTrace then print("[config] pruned " .. pruned .. " stale entr(ies) from " .. tostring(name)) end
                                     end
                                 end)
 
@@ -3097,7 +3097,7 @@ end
                     -- the key closed the populated menu and revealed the stale empty one.
                     local removed = purge_ghost_menu_windows(false)
                     if removed > 0 then
-                        print("[GHOST_HOOK] removed " .. removed .. " stale menu window(s) from a previous execution")
+                        if _G.__ghostLoadTrace then print("[GHOST_HOOK] removed " .. removed .. " stale menu window(s) from a previous execution") end
                     end
                 end
 
@@ -19128,7 +19128,7 @@ end
                         if not animator then
                             animator = Instance.new("Animator")
                             animator.Parent = humanoid
-                            print("[GHOST_HOOK AA] Animator created")
+                            if _G.__ghostLoadTrace then print("[GHOST_HOOK AA] Animator created") end
                         end
 
                         local animation = Instance.new("Animation")
