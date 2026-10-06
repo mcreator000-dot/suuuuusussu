@@ -21065,16 +21065,6 @@
                                                     if d.Name == "Topbar" then
                                                         -- let the art run into the top bar as well
                                                         if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
-                                                    elseif d:IsA("ImageLabel") and d.Name ~= "FunctionsBackground"
-                                                        and string.sub(d.Name, -10) == "Background"
-                                                        and as.X >= 100 and as.Y >= 50 then
-                                                        -- The theme paints its OWN backdrop art (TabSwitchersBackground
-                                                        -- over the sidebar, TopbarBackground over the header). Their
-                                                        -- BackgroundTransparency was already 1 -- it is ImageTransparency
-                                                        -- that carries the picture, so the sidebar kept showing one
-                                                        -- image and the panel another. Blank them so the single
-                                                        -- supplied image is the only art in the window.
-                                                        if d.ImageTransparency < 1 then d.ImageTransparency = 1 end
                                                     elseif d.Name == "Divider" and as.X >= 500 and as.Y <= 2 then
                                                         -- the blue rule under the header (585x1, the only wide flat Divider)
                                                         if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
@@ -21082,13 +21072,14 @@
                                                         if d.BackgroundTransparency < 1 then
                                                             d.BackgroundTransparency = 1
                                                         end
-
                                                     elseif d.Parent and d.Parent.Name == "Toggle"
-                                                        and as.X >= 25 and as.X <= 80 and as.Y >= 12 and as.Y <= 30 then
-                                                        -- Toggles stay FULLY OPAQUE: the switch and its knob. The bounds
-                                                        -- deliberately exclude the key picker (128 wide, faded above).
-                                                        if d.BackgroundTransparency > 0 then
-                                                            d.BackgroundTransparency = 0
+                                                        and as.X >= 30 and as.X <= 80 and as.Y >= 12 and as.Y <= 30
+                                                        and d.BackgroundColor3.R + d.BackgroundColor3.G + d.BackgroundColor3.B < 1.2 then
+                                                        -- the toggle switch in its OFF state (dark). Matched by position
+                                                        -- and colour rather than name, and the brightness test keeps the
+                                                        -- ON state -- the bright accent red -- fully solid.
+                                                        if d.BackgroundTransparency < FADE then
+                                                            d.BackgroundTransparency = FADE
                                                         end
                                                     elseif (FADE_NAMES[d.Name] and as.X >= 100 and as.Y >= 10)
                                                         or (as.X >= 150 and as.Y >= 40 and d.Parent
