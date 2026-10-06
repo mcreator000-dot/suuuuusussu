@@ -16924,7 +16924,8 @@ end
                         while task.wait(0.25) do   -- when disabled it early-outs below with a 0.4s extra wait
                             pcall(function()
                                 if not skinchanger_enabled then
-                                    task.wait(0.4)
+                                    -- idle longer while the feature is off: this loop wakes 4x/s otherwise
+                                    task.wait(1.2)
                                     return
                                 end
 
