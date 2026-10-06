@@ -5773,7 +5773,15 @@ end
                         local gv = status and status:FindFirstChild("GameplayVariables")
                         local equipped = gv and gv:FindFirstChild("EquippedTool") and gv.EquippedTool.Value
                         local weapon_name = equipped and equipped.Name
-                        local inventory = local_game_data and local_game_data.Inventory
+                        -- .Inventory throws "Inventory is not a valid member of Folder ..." when the
+                        -- child is simply absent (a fresh player folder has none), which aborted
+                        -- auto-reload. Look the child up instead, and stay table-compatible.
+                        local inventory
+                        if typeof(local_game_data) == "Instance" then
+                            inventory = local_game_data:FindFirstChild("Inventory")
+                        elseif type(local_game_data) == "table" then
+                            inventory = local_game_data.Inventory
+                        end
                         local container = weapon_name and inventory and _FindFirstChild(inventory, weapon_name)
                         if not container then return nil, nil, nil end
                         local attachments = _FindFirstChild(container, "Attachments")
@@ -21040,7 +21048,7 @@ end
                                                 local ct = b and b:FindFirstChild("Content", true)
                                                 if im and b then
                                                     local bp2 = b.AbsolutePosition
-                                                    im.Position = UDim2.fromOffset(0, 0)
+                                                    im.Position = UDim2.fromOffset(0, 0)   -- window-relative: art covers the top bar too
                                                     im.Size = UDim2.fromOffset(b.AbsoluteSize.X, b.AbsoluteSize.Y)
                                                 end
                                             end)
@@ -21093,7 +21101,7 @@ end
                                                         -- Sidebar backdrop: pinned to the OLD asset (139913314515436),
                                                         -- the one 651cf94 swapped away from. Runtime-pinned so it wins
                                                         -- regardless of patch order, and change the string to revert.
-                                                        local WANT_SIDEBAR = "rbxassetid://139913314515436"
+                                                        local WANT_SIDEBAR = "rbxassetid://95643540473475"
                                                         if d.Image ~= WANT_SIDEBAR then d.Image = WANT_SIDEBAR end
                                                             -- let the art run into the top bar as well
                                                             if d.BackgroundTransparency < 1 then d.BackgroundTransparency = 1 end
