@@ -15596,7 +15596,13 @@ end
 
                     task.spawn(function()
                         while cheat.alive and task.wait(0.5) do
-                            pcall(update_report_display)
+                            -- Only while the report counter is enabled. This ran update_report_display() twice a
+                            -- second forever, whether or not the feature was on: a repeating burst of work and
+                            -- allocation, matching the measured signature (spikes ~60 frames apart at ~105fps,
+                            -- i.e. every ~0.5s, gcinfo swinging 12.4MB).
+                            if report_display_enabled then
+                            	pcall(update_report_display)
+                            end
                         end
                     end)
 
