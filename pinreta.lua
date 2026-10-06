@@ -1566,6 +1566,19 @@
             until game_is_loaded() or _gate_waited >= 30
             print(string.format("[LOAD] gate: game ready after %.1fs (loaded=%s)", _gate_waited, tostring(game_is_loaded())))
 
+-- Load instrumentation: 30 [LOAD] stage prints used to fire on every execution. They cost
+-- startup time and buried real errors in the console (a crash trace was invisible under
+-- them). Silent by default -- set _G.__ghostLoadTrace = true to trace a load.
+if _G.__ghostLoadTrace == nil then _G.__ghostLoadTrace = false end
+if _G.__ghostLoadPrint == nil then
+    _G.__ghostLoadPrint = function()
+        if not _G.__ghostLoadTrace then return end
+        local _t = os.clock()
+        _G.__ghostLoadPrint()
+        _G.__ghostLoadMark = _t
+    end
+end
+
 
             local function loadGhostHookUiStack()
                 local GHOST_LIBRARY_URL = "https://raw.githubusercontent.com/kristerstomasuns-hub/essentials/main/test%20lib?v=mousefix-20261003"
@@ -5417,7 +5430,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local ignorelist=require(ReplicatedStorage.Modules.UniversalTables).ReturnTable("GlobalIgnoreListProjectile")
@@ -5525,7 +5538,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 -- remotes â€” non-blocking lookups; they exist by the time the player acts.
@@ -5963,7 +5976,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local norecoil, nobob = false, false
@@ -8727,7 +8740,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local espb = ui.box.esp:AddTab("Player ESP")
@@ -8987,7 +9000,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local object_tab = ui.box.object_esp:AddTab("Object ESP")
@@ -9327,7 +9340,7 @@
                                 if processed % 40 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -9385,7 +9398,7 @@
                                     if processed % 40 == 0 then
                                         task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                     end
                                 end
@@ -9431,7 +9444,7 @@
                                 if processed % 40 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -9471,7 +9484,7 @@
                                 if processed % 40 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -9511,7 +9524,7 @@
                                 if processed % 40 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -9836,7 +9849,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local cursor = {
@@ -12202,7 +12215,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 -- Radar system (ported from ghost)
@@ -12446,7 +12459,7 @@
                                 if processed % 150 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -12599,7 +12612,7 @@
                         if processed % 150 == 0 then
                             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                         end
                     end
@@ -12675,7 +12688,7 @@
                                 if processed % 150 == 0 then
                                     task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                 end
                             end
@@ -13045,7 +13058,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local othervisuals = player_camera_tab
@@ -13736,7 +13749,7 @@
                                     if processed % 150 == 0 then
                                         task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                     end
                                 end
@@ -14684,7 +14697,7 @@
                             child:WaitForChild("HumanoidRootPart", 1)
                             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                             vmpos(child)
                         end
@@ -14827,7 +14840,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local mvb = ui.box.move:AddTab('Character')
@@ -16561,7 +16574,7 @@
                                     if processed % 200 == 0 then
                                         task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
                                     end
                                 end
@@ -16994,7 +17007,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
 
             local desync_enabled = false
@@ -17453,7 +17466,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                     -- â”€â”€ 3D Grenade Trajectory & Neon Blast Range Ring System â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -18344,7 +18357,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 cheat.utility.new_heartbeat(LPH_JIT_MAX(function(delta)
@@ -18381,7 +18394,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local game_TweenService = game:GetService("TweenService")
@@ -18871,7 +18884,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local aa = player_anti_aim_tab
@@ -19374,7 +19387,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local combat_extras = ui.box.move_extra:AddTab('TP Kill')
@@ -19677,7 +19690,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local misctab_mv = ui.box.move_extra:AddTab('Movement Extras')
@@ -20142,7 +20155,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local misctab2 = ui.box.detection
@@ -20258,7 +20271,7 @@
             -- uninterrupted chunk (which reads as a freeze).
             task.wait()
             do local _t = os.clock()
-                print(string.format("[LOAD] +%.3fs  since_last=%.3fs", _t - (_G.__ghostLoadStart or _t), _t - (_G.__ghostLoadMark or _t)))
+                _G.__ghostLoadPrint()
                 _G.__ghostLoadMark = _t end
             do
                 local freecam_tab = world_freecam_tab
