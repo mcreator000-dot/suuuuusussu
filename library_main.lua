@@ -7,7 +7,7 @@ local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 
-local MACLIB_URL = "https://raw.githubusercontent.com/kristerstomasuns-hub/essentials/main/mclib?v=configfix-20260719"
+local MACLIB_URL = "https://raw.githubusercontent.com/mcreator000-dot/suuuuusussu/main/mclib?v=configfix-20260719"
 
 local function patchMacLibSource(macSource)
 	macSource = macSource:gsub("RunService%.RenderStepped:Connect%(UpdateOrientation%)", "if acrylicBlur then RunService.RenderStepped:Connect(UpdateOrientation) end")
